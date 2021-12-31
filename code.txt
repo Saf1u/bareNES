@@ -1,0 +1,6 @@
+LDA #$c0
+TAX
+INX
+BRK
+
+//
