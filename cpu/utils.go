@@ -15,3 +15,8 @@ func hasBit(n uint8, pos int) bool {
 	val := n & (1 << pos)
 	return (val > 0)
 }
+
+func hasBit16(n uint16, pos int) bool {
+	val := n & (1 << pos)
+	return (val > 0)
+}

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func parseToOpcodes(inst string,hexaDump *mem)  {
+func parseToOpcodes(inst string, hexaDump *mem) {
 
 	switch {
 	//lda immediate
@@ -2572,7 +2572,7 @@ func parseToOpcodes(inst string,hexaDump *mem)  {
 		instLoader++
 		break
 	}
-	
+
 }
 
 type mem struct {
@@ -2588,7 +2588,6 @@ func regex(pattern string, inst string) bool {
 
 var instructions = []string{}
 
-
 //ReadFile reads instructions provided as memonics and returns hex mapping
 func ReadFile(filename string) []uint8 {
 	var hexaDump = &mem{}
@@ -2601,14 +2600,9 @@ func ReadFile(filename string) []uint8 {
 	reader := bufio.NewReader(fl)
 	parseProgram(reader)
 	for _, c := range instructions {
-		parseToOpcodes(c,hexaDump)
+		parseToOpcodes(c, hexaDump)
 	}
-	start := 0
 
-	for start != instLoader {
-		fmt.Println(strconv.FormatInt(int64(hexaDump.mem[start]), 16))
-		start++
-	}
 	return hexaDump.mem[0:instLoader]
 }
 
@@ -2639,4 +2633,3 @@ func processInstruction(token string) {
 	instructions = append(instructions, instruction[0])
 
 }
-
