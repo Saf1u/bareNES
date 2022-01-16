@@ -563,6 +563,7 @@ func (c *Cpu) ASL(mode string) {
 // 	if hasBit(c.statusRegister, 0) {
 
 // 	}
+//}
 
 // }
 // func (c *Cpu) ROR(mode string) {
@@ -593,13 +594,82 @@ func (c *Cpu) JMP(mode string) {
 
 }
 
-// func (c *Cpu) BMI() {
-// 	loc := c.addrMode("imm")
-// 	if hasBit(c.statusRegister, 7) {
-// 		c.pc = c.pc + loc
+func (c *Cpu) BMI() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if hasBit(c.statusRegister, 7) {
+		c.pc = c.pc + uint16(toJump)
 
-// 	}
-// }
+	}
+}
+func (c *Cpu) BPL() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if !hasBit(c.statusRegister, 7) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+
+func (c *Cpu) BVS() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if hasBit(c.statusRegister, 6) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+
+func (c *Cpu) BVC() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if !hasBit(c.statusRegister, 6) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+func (c *Cpu) BCC() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if !hasBit(c.statusRegister, 0) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+func (c *Cpu) BEQ() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if hasBit(c.statusRegister, 1) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+func (c *Cpu) BNE() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if !hasBit(c.statusRegister, 1) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
+
+
+
+
 
 func (c *Cpu) run() {
 
