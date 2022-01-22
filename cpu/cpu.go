@@ -88,36 +88,53 @@ func (c *Cpu) ReadDoubleByte(addr uint16) uint16 {
 	res := (hi << 8) | low
 	return res
 }
+
+const (
+	IMMEDIATE      = "imm"
+	ZERO_PAGE_X    = "zpx"
+	ABSOLUTE       = "abs"
+	ZERO_PAGE_Y    = "zpy"
+	ABSOLUTE_X     = "absx"
+	ABSOLUTE_Y     = "absy"
+	INDIRECT_X     = "indx"
+	INDRECT_Y      = "indy"
+	CARRY_FLAG     = 0
+	ZERO_FLAG      = 1
+	INTERRUPT_FLAG = 2
+	BREAK_FLAG     = 4
+	OVERFLOW_FLAG  = 6
+	NEGATIVE_FLAG  = 7
+)
+
 func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
 	switch {
-	case mode == "imm":
+	case mode == IMMEDIATE:
 		dataLocation = c.pc
-		break
-	case mode == "zp":
+	case mode == ZERO_PAGE_X:
 		dataLocation = uint16(c.ReadSingleByte(c.pc))
-	case mode == "abs":
+	case mode == ABSOLUTE_X:
 		dataLocation = c.ReadDoubleByte(c.pc)
-	case mode == "zpx":
+	case mode == ZERO_PAGE_X:
 		data := c.ReadSingleByte(c.pc)
 		var c uint8 = data + c.xRegister
 		dataLocation = uint16(c)
-	case mode == "zpy":
+	case mode == ZERO_PAGE_Y:
 		data := c.ReadSingleByte(c.pc)
 		var c uint8 = data + c.yRegister
 		dataLocation = uint16(c)
-	case mode == "absx":
+	case mode == ABSOLUTE_X:
 		data := c.ReadDoubleByte(c.pc)
 		dataLocation = data + uint16(c.xRegister)
-	case mode == "absy":
+	case mode == ABSOLUTE_Y:
 		data := c.ReadDoubleByte(c.pc)
 		dataLocation = data + uint16(c.yRegister)
-	case mode == "indx":
+	case mode == INDIRECT_X:
 		base := c.ReadSingleByte(c.pc) + c.xRegister
 		low := uint16(c.ReadSingleByte(uint16(base)))
 		hi := uint16(c.ReadSingleByte(uint16(base) + 1))
 		dataLocation = (hi << 8) | low
-	case mode == "indy":
+	case mode == INDRECT_Y:
 		pos := uint16(c.ReadSingleByte(c.pc))
 		low := c.ReadSingleByte(pos)
 		hi := c.ReadSingleByte(pos + 1)
@@ -135,19 +152,58 @@ func (c *Cpu) set() {
 	c.pc = c.ReadDoubleByte(0xfffc)
 	c.statusRegister = 0
 }
+func (c *Cpu) setCarry() {
+	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
 
+}
+func (c *Cpu) ClearCarry() {
+	c.statusRegister = (clearBit(c.statusRegister, CARRY_FLAG))
+}
+func (c *Cpu) GetBit(pos int) uint8 {
+	return getBit(c.statusRegister, pos)
+}
+func (c *Cpu) SetZero() {
+	c.statusRegister = (setBit(c.statusRegister, ZERO_FLAG))
+}
+func (c *Cpu) ClearZero() {
+	c.statusRegister = (clearBit(c.statusRegister, ZERO_FLAG))
+}
+func (c *Cpu) SetInterrupt() {
+	c.statusRegister = (setBit(c.statusRegister, INTERRUPT_FLAG))
+}
+func (c *Cpu) ClearInterrupt() {
+	c.statusRegister = (clearBit(c.statusRegister, INTERRUPT_FLAG))
+}
+func (c *Cpu) SetBreak() {
+	c.statusRegister = (setBit(c.statusRegister, BREAK_FLAG))
+}
+func (c *Cpu) ClearBreak() {
+	c.statusRegister = (clearBit(c.statusRegister, BREAK_FLAG))
+}
+func (c *Cpu) SetOverflow() {
+	c.statusRegister = (setBit(c.statusRegister, OVERFLOW_FLAG))
+}
+func (c *Cpu) ClearOverflow() {
+	c.statusRegister = (clearBit(c.statusRegister, OVERFLOW_FLAG))
+}
+func (c *Cpu) SetNegative() {
+	c.statusRegister = (setBit(c.statusRegister, NEGATIVE_FLAG))
+}
+func (c *Cpu) ClearNegative() {
+	c.statusRegister = (clearBit(c.statusRegister, NEGATIVE_FLAG))
+}
 func (c *Cpu) LDA(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.aRegister = data
@@ -157,14 +213,14 @@ func (c *Cpu) LDX(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.xRegister = data
@@ -174,14 +230,14 @@ func (c *Cpu) LDY(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.xRegister = data
@@ -202,14 +258,14 @@ func (c *Cpu) STY(mode string) {
 func (c *Cpu) TAX() {
 	data := c.aRegister
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.xRegister = data
@@ -217,14 +273,14 @@ func (c *Cpu) TAX() {
 func (c *Cpu) TAY() {
 	data := c.aRegister
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.yRegister = data
@@ -233,14 +289,14 @@ func (c *Cpu) TAY() {
 func (c *Cpu) TXA() {
 	data := c.xRegister
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.aRegister = data
@@ -248,14 +304,14 @@ func (c *Cpu) TXA() {
 func (c *Cpu) TYA() {
 	data := c.yRegister
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.aRegister = data
@@ -268,14 +324,14 @@ func (c *Cpu) TXS() {
 func (c *Cpu) TSX() {
 	data := c.stackPtr
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 	c.xRegister = data
@@ -286,14 +342,14 @@ func (c *Cpu) AND(mode string) {
 	data := c.ReadSingleByte(loc)
 	c.aRegister = data & c.aRegister
 	if c.aRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.aRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -303,14 +359,14 @@ func (c *Cpu) ORA(mode string) {
 	data := c.ReadSingleByte(loc)
 	c.aRegister = data | c.aRegister
 	if c.aRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.aRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -320,14 +376,14 @@ func (c *Cpu) EOR(mode string) {
 	data := c.ReadSingleByte(loc)
 	c.aRegister = data ^ c.aRegister
 	if c.aRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.aRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -335,28 +391,28 @@ func (c *Cpu) EOR(mode string) {
 func (c *Cpu) INX() {
 	c.xRegister++
 	if c.xRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.xRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
 func (c *Cpu) INY() {
 	c.yRegister++
 	if c.yRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.yRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -364,14 +420,14 @@ func (c *Cpu) INY() {
 func (c *Cpu) DEX() {
 	c.xRegister--
 	if c.xRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.xRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -379,14 +435,14 @@ func (c *Cpu) DEX() {
 func (c *Cpu) DEY() {
 	c.yRegister--
 	if c.yRegister == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(c.yRegister, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -397,14 +453,14 @@ func (c *Cpu) INC(mode string) {
 	data++
 	c.WriteSingleByte(loc, data)
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -415,14 +471,14 @@ func (c *Cpu) DEC(mode string) {
 	data--
 	c.WriteSingleByte(loc, data)
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -432,19 +488,19 @@ func (c *Cpu) CMP(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.aRegister - data
 	if c.aRegister >= data {
-		c.statusRegister = (setBit(c.statusRegister, 0))
+		c.setCarry()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 0))
+		c.ClearCarry()
 	}
 	if c.aRegister == data {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(temp, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -454,19 +510,19 @@ func (c *Cpu) CPX(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.xRegister - data
 	if c.xRegister >= data {
-		c.statusRegister = (setBit(c.statusRegister, 0))
+		c.setCarry()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 0))
+		c.ClearCarry()
 	}
 	if c.xRegister == data {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(temp, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -475,19 +531,19 @@ func (c *Cpu) CPY(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.yRegister - data
 	if c.yRegister >= data {
-		c.statusRegister = (setBit(c.statusRegister, 0))
+		c.setCarry()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 0))
+		c.ClearCarry()
 	}
 	if c.yRegister == data {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(temp, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -497,19 +553,19 @@ func (c *Cpu) BIT(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := data & c.aRegister
 	if temp == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 	if hasBit(data, 6) {
-		c.statusRegister = (setBit(c.statusRegister, 6))
+		c.SetOverflow()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 6))
+		c.ClearOverflow()
 	}
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 
 }
@@ -518,17 +574,17 @@ func (c *Cpu) LSR(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if hasBit(data, 0) {
-		c.statusRegister = (setBit(c.statusRegister, 0))
+		c.setCarry()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 0))
+		c.ClearCarry()
 	}
 	data = data >> 1
 	c.WriteSingleByte(loc, data)
-	c.statusRegister = (clearBit(c.statusRegister, 7))
+	c.ClearNegative()
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 
 }
@@ -537,21 +593,21 @@ func (c *Cpu) ASL(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 0))
+		c.setCarry()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 0))
+		c.ClearCarry()
 	}
 	data = data << 1
 	c.WriteSingleByte(loc, data)
 	if hasBit(data, 7) {
-		c.statusRegister = (setBit(c.statusRegister, 7))
+		c.SetNegative()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 7))
+		c.ClearNegative()
 	}
 	if data == 0 {
-		c.statusRegister = (setBit(c.statusRegister, 1))
+		c.SetZero()
 	} else {
-		c.statusRegister = (clearBit(c.statusRegister, 1))
+		c.ClearZero()
 	}
 
 }
@@ -666,10 +722,10 @@ func (c *Cpu) BNE() {
 
 	}
 }
-
-
-
-
+func (c *Cpu) incrementPassInstruction(inst uint8) {
+	inc := uint16(pcIncrement[inst]) - 1
+	c.pc = c.pc + inc
+}
 
 func (c *Cpu) run() {
 
@@ -681,36 +737,28 @@ func (c *Cpu) run() {
 			return
 		case inst == 0xa9:
 			c.LDA("imm")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xA5:
 			c.LDA("zp")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xb5:
 			c.LDA("zpx")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xad:
 			c.LDA("abs")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xbd:
 			c.LDA("absx")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xb9:
 			c.LDA("absy")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xa1:
 			c.LDA("indx")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 		case inst == 0xb1:
 			c.LDA("indy")
-			inc := uint16(pcIncrement[inst]) - 1
-			c.pc = c.pc + inc
+			c.incrementPassInstruction(inst)
 
 		}
 		if c.pc == programLocation {
