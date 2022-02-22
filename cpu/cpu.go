@@ -13,13 +13,6 @@ type Cpu struct {
 	mem            [0xFFFF]uint8
 }
 
-func (c *Cpu) Acc() uint8 {
-	return c.aRegister
-}
-func (c *Cpu) Stat() uint8 {
-	return c.statusRegister
-}
-
 var programLength int
 
 //num of bytes to move pc depending on instruction
@@ -82,13 +75,6 @@ var pcIncrement = map[uint8]int{
 	0x98: 1,
 }
 
-func (c *Cpu) ReadDoubleByte(addr uint16) uint16 {
-	var low uint16 = uint16(c.mem[addr])
-	var hi uint16 = uint16(c.mem[addr+1])
-	res := (hi << 8) | low
-	return res
-}
-
 const (
 	IMMEDIATE      = "imm"
 	ZERO_PAGE_X    = "zpx"
@@ -105,6 +91,21 @@ const (
 	OVERFLOW_FLAG  = 6
 	NEGATIVE_FLAG  = 7
 )
+const STACK_PAGE uint16 = 0x0100
+
+func (c *Cpu) Acc() uint8 {
+	return c.aRegister
+}
+func (c *Cpu) Stat() uint8 {
+	return c.statusRegister
+}
+
+func (c *Cpu) ReadDoubleByte(addr uint16) uint16 {
+	var low uint16 = uint16(c.mem[addr])
+	var hi uint16 = uint16(c.mem[addr+1])
+	res := (hi << 8) | low
+	return res
+}
 
 func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
@@ -152,11 +153,11 @@ func (c *Cpu) set() {
 	c.pc = c.ReadDoubleByte(0xfffc)
 	c.statusRegister = 0
 }
-func (c *Cpu) setCarry() {
+func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
 
 }
-func (c *Cpu) ClearCarry() {
+func (c *Cpu) CLC() {
 	c.statusRegister = (clearBit(c.statusRegister, CARRY_FLAG))
 }
 func (c *Cpu) GetBit(pos int) uint8 {
@@ -168,10 +169,10 @@ func (c *Cpu) SetZero() {
 func (c *Cpu) ClearZero() {
 	c.statusRegister = (clearBit(c.statusRegister, ZERO_FLAG))
 }
-func (c *Cpu) SetInterrupt() {
+func (c *Cpu) SEI() {
 	c.statusRegister = (setBit(c.statusRegister, INTERRUPT_FLAG))
 }
-func (c *Cpu) ClearInterrupt() {
+func (c *Cpu) CLI() {
 	c.statusRegister = (clearBit(c.statusRegister, INTERRUPT_FLAG))
 }
 func (c *Cpu) SetBreak() {
@@ -183,7 +184,7 @@ func (c *Cpu) ClearBreak() {
 func (c *Cpu) SetOverflow() {
 	c.statusRegister = (setBit(c.statusRegister, OVERFLOW_FLAG))
 }
-func (c *Cpu) ClearOverflow() {
+func (c *Cpu) CLV() {
 	c.statusRegister = (clearBit(c.statusRegister, OVERFLOW_FLAG))
 }
 func (c *Cpu) SetNegative() {
@@ -319,6 +320,9 @@ func (c *Cpu) TYA() {
 func (c *Cpu) TXS() {
 	data := c.xRegister
 	c.stackPtr = data
+}
+func (c *Cpu) stackIncrement() uint16 {
+	return uint16(c.stackPtr) + STACK_PAGE
 }
 
 func (c *Cpu) TSX() {
@@ -488,9 +492,9 @@ func (c *Cpu) CMP(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.aRegister - data
 	if c.aRegister >= data {
-		c.setCarry()
+		c.SEC()
 	} else {
-		c.ClearCarry()
+		c.CLC()
 	}
 	if c.aRegister == data {
 		c.SetZero()
@@ -510,9 +514,9 @@ func (c *Cpu) CPX(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.xRegister - data
 	if c.xRegister >= data {
-		c.setCarry()
+		c.SEC()
 	} else {
-		c.ClearCarry()
+		c.CLC()
 	}
 	if c.xRegister == data {
 		c.SetZero()
@@ -531,9 +535,9 @@ func (c *Cpu) CPY(mode string) {
 	data := c.ReadSingleByte(loc)
 	temp := c.yRegister - data
 	if c.yRegister >= data {
-		c.setCarry()
+		c.SEC()
 	} else {
-		c.ClearCarry()
+		c.CLC()
 	}
 	if c.yRegister == data {
 		c.SetZero()
@@ -560,7 +564,7 @@ func (c *Cpu) BIT(mode string) {
 	if hasBit(data, 6) {
 		c.SetOverflow()
 	} else {
-		c.ClearOverflow()
+		c.CLV()
 	}
 	if hasBit(data, 7) {
 		c.SetNegative()
@@ -574,9 +578,9 @@ func (c *Cpu) LSR(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if hasBit(data, 0) {
-		c.setCarry()
+		c.SEC()
 	} else {
-		c.ClearCarry()
+		c.CLC()
 	}
 	data = data >> 1
 	c.WriteSingleByte(loc, data)
@@ -593,9 +597,9 @@ func (c *Cpu) ASL(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
 	if hasBit(data, 7) {
-		c.setCarry()
+		c.SEC()
 	} else {
-		c.ClearCarry()
+		c.CLC()
 	}
 	data = data << 1
 	c.WriteSingleByte(loc, data)
@@ -612,25 +616,67 @@ func (c *Cpu) ASL(mode string) {
 
 }
 
-// func (c *Cpu) ROL(mode string) {
-// 	loc := c.addrMode(mode)
-// 	data := c.ReadSingleByte(loc)
-// 	oldcarry
-// 	if hasBit(c.statusRegister, 0) {
+func (c *Cpu) ROL(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	temp := c.GetBit(CARRY_FLAG)
+	templast := getBit(data, 7)
+	data = data << 1
+	if temp > 0 {
+		data = setBit(data, 0)
+	} else {
+		data = clearBit(data, 0)
+	}
+	if templast > 0 {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+	if data == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	templast = getBit(data, 7)
 
-// 	}
-//}
+	if templast > 0 {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
 
-// }
-// func (c *Cpu) ROR(mode string) {
-// 	loc := c.addrMode(mode)
-// 	data := c.ReadSingleByte(loc)
-// 	oldcarry
-// 	if hasBit(c.statusRegister, 0) {
+}
 
-// 	}
+func (c *Cpu) ROR(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	temp := c.GetBit(CARRY_FLAG)
+	templast := getBit(data, 0)
+	data = data >> 1
+	if temp > 0 {
+		data = setBit(data, 7)
+	} else {
+		data = clearBit(data, 7)
+	}
+	if templast > 0 {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+	if data == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
 
-// }
+	if temp > 0 {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+
+}
+
 func (c *Cpu) JMP(mode string) {
 	loc := c.addrMode("abs")
 	if mode == "absind" {
@@ -728,10 +774,11 @@ func (c *Cpu) incrementPassInstruction(inst uint8) {
 }
 
 func (c *Cpu) run() {
+	inst := c.mem[c.pc]
+	c.pc++
 
 	for {
-		inst := c.mem[c.pc]
-		c.pc++
+
 		switch {
 		case inst == 0x00:
 			return
@@ -761,9 +808,12 @@ func (c *Cpu) run() {
 			c.incrementPassInstruction(inst)
 
 		}
+
 		if c.pc == programLocation {
 			break
 		}
+		inst = c.mem[c.pc]
+		c.pc++
 	}
 }
 
@@ -798,4 +848,8 @@ func (c *Cpu) LoadToRomandStart(data []uint8) {
 	c.LoadToRom(data)
 	c.set()
 	c.run()
+}
+func (c *Cpu) LoadToMem(data []uint8) {
+	copy(c.mem[0xFC:0xFC+len(data)], data)
+
 }
