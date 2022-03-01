@@ -768,6 +768,64 @@ func (c *Cpu) BNE() {
 
 	}
 }
+func (c *Cpu) PHA() {
+	acc := c.Acc()
+	c.Push(acc)
+}
+func (c *Cpu) PHP() {
+	reg := c.statusRegister
+	c.Push(reg)
+}
+func (c *Cpu) PLA() {
+	acc := c.Pop()
+	if acc == 0 {
+		c.SetZero()
+	} else {
+		if hasBit(acc, 7) {
+			c.SetNegative()
+		} else {
+			c.ClearNegative()
+		}
+	}
+	c.aRegister = acc
+}
+func (c *Cpu) RTI() {
+	stat := c.Pop()
+	c.statusRegister = stat
+	vala := uint16(c.Pop())
+	valb := uint16(c.Pop())
+	res := vala<<8 | valb
+	c.pc = res
+	if !hasBit(c.statusRegister, INTERRUPT_FLAG) {
+		c.SEI()
+	}
+
+}
+
+func (c *Cpu) PLP() {
+	reg := c.Pop()
+	if reg == 0 {
+		c.SetZero()
+	} else {
+		if hasBit(reg, 7) {
+			c.SetNegative()
+		} else {
+			c.ClearNegative()
+		}
+	}
+	c.statusRegister = reg
+}
+func (c *Cpu) Push(val uint8) {
+	c.mem[c.stackPtr] = val
+	c.stackPtr++
+}
+func (c *Cpu) Pop() uint8 {
+	c.stackPtr--
+	temp := c.mem[c.stackPtr]
+	c.mem[c.stackPtr] = 0
+	return temp
+}
+
 func (c *Cpu) incrementPassInstruction(inst uint8) {
 	inc := uint16(pcIncrement[inst]) - 1
 	c.pc = c.pc + inc
@@ -783,7 +841,7 @@ func (c *Cpu) run() {
 		case inst == 0x00:
 			return
 		case inst == 0xa9:
-			c.LDA("imm")
+			c.LDA(IMMEDIATE)
 			c.incrementPassInstruction(inst)
 		case inst == 0xA5:
 			c.LDA("zp")
