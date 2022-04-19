@@ -13,6 +13,8 @@ type Cpu struct {
 	mem            [0xFFFF]uint8
 }
 
+const STACK uint16 = 0
+
 var programLength int
 
 //num of bytes to move pc depending on instruction
@@ -193,22 +195,7 @@ func (c *Cpu) SetNegative() {
 func (c *Cpu) ClearNegative() {
 	c.statusRegister = (clearBit(c.statusRegister, NEGATIVE_FLAG))
 }
-func (c *Cpu) LDA(mode string) {
-	loc := c.addrMode(mode)
-	data := c.ReadSingleByte(loc)
-	if data == 0 {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(data, 7) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
 
-	c.aRegister = data
-}
 
 func (c *Cpu) LDX(mode string) {
 	loc := c.addrMode(mode)
@@ -575,15 +562,25 @@ func (c *Cpu) BIT(mode string) {
 }
 
 func (c *Cpu) LSR(mode string) {
-	loc := c.addrMode(mode)
-	data := c.ReadSingleByte(loc)
+	var data uint8
+	var loc uint16
+	if mode == "Accumulator" {
+		data = c.Acc()
+	} else {
+		loc = c.addrMode(mode)
+		data = c.ReadSingleByte(loc)
+	}
 	if hasBit(data, 0) {
 		c.SEC()
 	} else {
 		c.CLC()
 	}
 	data = data >> 1
-	c.WriteSingleByte(loc, data)
+	if mode == "Accumulator" {
+		c.aRegister = data
+	} else {
+		c.WriteSingleByte(loc, data)
+	}
 	c.ClearNegative()
 	if data == 0 {
 		c.SetZero()
@@ -594,15 +591,25 @@ func (c *Cpu) LSR(mode string) {
 }
 
 func (c *Cpu) ASL(mode string) {
-	loc := c.addrMode(mode)
-	data := c.ReadSingleByte(loc)
+	var data uint8
+	var loc uint16
+	if mode == "Accumulator" {
+		data = c.Acc()
+	} else {
+		loc = c.addrMode(mode)
+		data = c.ReadSingleByte(loc)
+	}
 	if hasBit(data, 7) {
 		c.SEC()
 	} else {
 		c.CLC()
 	}
 	data = data << 1
-	c.WriteSingleByte(loc, data)
+	if mode == "Accumulator" {
+		c.aRegister = data
+	} else {
+		c.WriteSingleByte(loc, data)
+	}
 	if hasBit(data, 7) {
 		c.SetNegative()
 	} else {
@@ -617,11 +624,23 @@ func (c *Cpu) ASL(mode string) {
 }
 
 func (c *Cpu) ROL(mode string) {
-	loc := c.addrMode(mode)
-	data := c.ReadSingleByte(loc)
+	var data uint8
+	var loc uint16
+	if mode == "Accumulator" {
+		data = c.Acc()
+	} else {
+		loc = c.addrMode(mode)
+		data = c.ReadSingleByte(loc)
+	}
+
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 7)
 	data = data << 1
+	if mode == "Accumulator" {
+		c.aRegister = data
+	} else {
+		c.WriteSingleByte(loc, data)
+	}
 	if temp > 0 {
 		data = setBit(data, 0)
 	} else {
@@ -648,11 +667,22 @@ func (c *Cpu) ROL(mode string) {
 }
 
 func (c *Cpu) ROR(mode string) {
-	loc := c.addrMode(mode)
-	data := c.ReadSingleByte(loc)
+	var data uint8
+	var loc uint16
+	if mode == "Accumulator" {
+		data = c.Acc()
+	} else {
+		loc = c.addrMode(mode)
+		data = c.ReadSingleByte(loc)
+	}
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 0)
 	data = data >> 1
+	if mode == "Accumulator" {
+		c.aRegister = data
+	} else {
+		c.WriteSingleByte(loc, data)
+	}
 	if temp > 0 {
 		data = setBit(data, 7)
 	} else {
@@ -678,10 +708,11 @@ func (c *Cpu) ROR(mode string) {
 }
 
 func (c *Cpu) JMP(mode string) {
-	loc := c.addrMode("abs")
-	if mode == "absind" {
-		c.pc = loc
+
+	if mode == "abs" {
+		c.pc = c.ReadDoubleByte(c.pc)
 	} else {
+		loc := c.ReadDoubleByte(c.pc)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
 		//
 		if loc&0x00ff == 0x00ff {
@@ -758,6 +789,16 @@ func (c *Cpu) BEQ() {
 
 	}
 }
+func (c *Cpu) BCS() {
+	loc := c.addrMode("imm")
+	//location of perand to jump too in mem not acc value itself is loc
+	toJump := int8(c.ReadSingleByte(loc))
+	c.pc++
+	if hasBit(c.statusRegister, 0) {
+		c.pc = c.pc + uint16(toJump)
+
+	}
+}
 func (c *Cpu) BNE() {
 	loc := c.addrMode("imm")
 	//location of perand to jump too in mem not acc value itself is loc
@@ -790,15 +831,31 @@ func (c *Cpu) PLA() {
 	c.aRegister = acc
 }
 func (c *Cpu) RTI() {
-	stat := c.Pop()
-	c.statusRegister = stat
-	vala := uint16(c.Pop())
-	valb := uint16(c.Pop())
-	res := vala<<8 | valb
-	c.pc = res
-	if !hasBit(c.statusRegister, INTERRUPT_FLAG) {
-		c.SEI()
+	c.statusRegister = c.Pop()
+	c.pc = c.Pop16()
+	if !hasBit(c.statusRegister, 2) {
+		c.CLI()
 	}
+
+}
+func (c *Cpu) BRK() {
+	c.Push(c.statusRegister)
+	hi := uint8(c.pc >> 8)
+	lo := uint8(c.pc & 0b0000000011111111)
+	c.Push(hi)
+	c.Push(lo)
+	c.SEI()
+}
+func (c *Cpu) JSR() {
+	//we need to make sure we increment within the same cycle
+	c.Push16(c.pc + 2)
+	cal := c.addrMode("imm")
+	addr := c.ReadDoubleByte(cal)
+	c.pc = addr
+}
+func (c *Cpu) RTS() {
+	val := c.Pop16()
+	c.pc = val + 1
 
 }
 
@@ -815,14 +872,65 @@ func (c *Cpu) PLP() {
 	}
 	c.statusRegister = reg
 }
+
+// func(c *Cpu) DCP(mode string){
+// 	loc:=c.addrMode(mode)
+// 	data := c.ReadSingleByte(loc)
+// 	data--
+// 	c.WriteSingleByte(loc,data)
+	
+// 	if data == 0 {
+// 		c.SetZero()
+// 	} else {
+// 		c.ClearZero()
+// 	}
+// 	if hasBit(data, 7) {
+// 		c.SetNegative()
+// 	} else {
+// 		c.ClearNegative()
+// 	}
+	
+// }
+func (c *Cpu) LDA(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	if data == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(data, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+
+	c.aRegister = data
+}
+
 func (c *Cpu) Push(val uint8) {
-	c.mem[c.stackPtr] = val
-	c.stackPtr++
+	loc := STACK + uint16(c.stackPtr)
+	c.mem[loc] = val
+	c.stackPtr--
+}
+func (c *Cpu) Push16(val uint16) {
+	hi := uint8(val >> 8)
+	lo := uint8(val & 0x00FF)
+	c.Push(hi)
+	c.Push(lo)
+}
+func (c *Cpu) Pop16() uint16 {
+	lo := uint16(c.Pop())
+	hi := uint16(c.Pop())
+	val := (hi<<8 | lo)
+	return val
 }
 func (c *Cpu) Pop() uint8 {
-	c.stackPtr--
-	temp := c.mem[c.stackPtr]
-	c.mem[c.stackPtr] = 0
+	c.stackPtr++
+	//stack grows down
+	loc := STACK + uint16(c.stackPtr)
+	temp := c.mem[loc]
+	c.mem[loc] = 0
 	return temp
 }
 

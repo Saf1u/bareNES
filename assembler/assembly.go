@@ -1,4 +1,4 @@
-package disassembler
+package assembler
 
 import (
 	"bufio"

@@ -1,11 +1,7 @@
 package cpu
 
-import (
-	"fmt"
-)
-
 func setBit(num uint8, pos int) uint8 {
-	fmt.Println(num)
+
 	num |= (uint8(1) << pos)
 	return num
 }
