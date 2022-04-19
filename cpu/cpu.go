@@ -78,6 +78,7 @@ var pcIncrement = map[uint8]int{
 }
 
 const (
+	ACCUMULATOR    = "Accumulator"
 	IMMEDIATE      = "imm"
 	ZERO_PAGE_X    = "zpx"
 	ABSOLUTE       = "abs"
@@ -195,7 +196,6 @@ func (c *Cpu) SetNegative() {
 func (c *Cpu) ClearNegative() {
 	c.statusRegister = (clearBit(c.statusRegister, NEGATIVE_FLAG))
 }
-
 
 func (c *Cpu) LDX(mode string) {
 	loc := c.addrMode(mode)
@@ -561,7 +561,7 @@ func (c *Cpu) BIT(mode string) {
 
 }
 
-func (c *Cpu) LSR(mode string) {
+func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == "Accumulator" {
@@ -587,10 +587,13 @@ func (c *Cpu) LSR(mode string) {
 	} else {
 		c.ClearZero()
 	}
+	if len(hidden) != 0 {
+		hidden[0] = &data
+	}
 
 }
 
-func (c *Cpu) ASL(mode string) {
+func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == "Accumulator" {
@@ -620,10 +623,13 @@ func (c *Cpu) ASL(mode string) {
 	} else {
 		c.ClearZero()
 	}
+	if len(hidden) != 0 {
+		hidden[0] = &data
+	}
 
 }
 
-func (c *Cpu) ROL(mode string) {
+func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == "Accumulator" {
@@ -662,6 +668,9 @@ func (c *Cpu) ROL(mode string) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
+	}
+	if len(hidden) != 0 {
+		hidden[0] = &data
 	}
 
 }
@@ -878,7 +887,7 @@ func (c *Cpu) PLP() {
 // 	data := c.ReadSingleByte(loc)
 // 	data--
 // 	c.WriteSingleByte(loc,data)
-	
+
 // 	if data == 0 {
 // 		c.SetZero()
 // 	} else {
@@ -889,8 +898,110 @@ func (c *Cpu) PLP() {
 // 	} else {
 // 		c.ClearNegative()
 // 	}
-	
+
 // }
+func (c *Cpu) RLA(mode string) {
+	var data *uint8
+	c.ROL(mode, data)
+	c.aRegister = c.aRegister & (*data)
+	if c.aRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+}
+func (c *Cpu) SLA(mode string) {
+	var data *uint8
+	c.ASL(mode, data)
+	c.aRegister = c.aRegister | (*data)
+	if c.aRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+}
+func (c *Cpu) SRE(mode string) {
+	var data *uint8
+	c.LSR(mode, data)
+	c.aRegister = c.aRegister ^ (*data)
+	if c.aRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+
+}
+func (c *Cpu) AXS(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	c.xRegister = c.xRegister & c.aRegister
+	if data <= c.xRegister {
+		c.SEC()
+	}
+	c.xRegister = c.xRegister - data
+
+	if c.xRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.xRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+}
+func (c *Cpu) ARR(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	c.aRegister = data & c.aRegister
+	c.ROR(ACCUMULATOR)
+	temp := c.Acc()
+	if hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SEC()
+		c.CLV()
+	}
+	if !hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.CLV()
+	}
+	if hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.SetOverflow()
+	}
+	if !hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SetOverflow()
+		c.SEC()
+	}
+
+	if temp == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(temp, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+
+}
+
 func (c *Cpu) LDA(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
