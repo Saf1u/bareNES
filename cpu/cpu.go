@@ -229,9 +229,22 @@ func (c *Cpu) LDY(mode string) {
 func (c *Cpu) ADC(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
-	c.aRegister = c.aRegister + data
+	temp := c.aRegister + data
 	if hasBit(c.statusRegister, CARRY_FLAG) {
-		c.aRegister++
+		temp++
+	}
+
+	if (!hasBit(c.aRegister, 7) && !hasBit(data, 7)) && (hasBit(temp, 7)) {
+		c.SetOverflow()
+	} else {
+		if (hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
+			c.SetOverflow()
+		}else{
+			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
+				c.SetOverflow()
+			}
+		}
+
 	}
 }
 
@@ -481,7 +494,7 @@ func (c *Cpu) BIT(mode string) {
 func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -513,7 +526,7 @@ func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -525,7 +538,7 @@ func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 		c.CLC()
 	}
 	data = data << 1
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
 		c.WriteSingleByte(loc, data)
@@ -540,7 +553,7 @@ func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -550,7 +563,7 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 7)
 	data = data << 1
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
 		c.WriteSingleByte(loc, data)
@@ -586,7 +599,7 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -595,7 +608,7 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 0)
 	data = data >> 1
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
 		c.WriteSingleByte(loc, data)
@@ -629,7 +642,7 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 
 func (c *Cpu) JMP(mode string) {
 
-	if mode == "abs" {
+	if mode == ABSOLUTE {
 		c.pc = c.ReadDoubleByte(c.pc)
 	} else {
 		loc := c.ReadDoubleByte(c.pc)
@@ -648,7 +661,7 @@ func (c *Cpu) JMP(mode string) {
 }
 
 func (c *Cpu) BMI() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -658,7 +671,7 @@ func (c *Cpu) BMI() {
 	}
 }
 func (c *Cpu) BPL() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -669,7 +682,7 @@ func (c *Cpu) BPL() {
 }
 
 func (c *Cpu) BVS() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -680,7 +693,7 @@ func (c *Cpu) BVS() {
 }
 
 func (c *Cpu) BVC() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -690,7 +703,7 @@ func (c *Cpu) BVC() {
 	}
 }
 func (c *Cpu) BCC() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -700,7 +713,7 @@ func (c *Cpu) BCC() {
 	}
 }
 func (c *Cpu) BEQ() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -710,7 +723,7 @@ func (c *Cpu) BEQ() {
 	}
 }
 func (c *Cpu) BCS() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -720,7 +733,7 @@ func (c *Cpu) BCS() {
 	}
 }
 func (c *Cpu) BNE() {
-	loc := c.addrMode("imm")
+	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
@@ -769,7 +782,7 @@ func (c *Cpu) BRK() {
 func (c *Cpu) JSR() {
 	//we need to make sure we increment within the same cycle
 	c.Push16(c.pc + 2)
-	cal := c.addrMode("imm")
+	cal := c.addrMode(IMMEDIATE)
 	addr := c.ReadDoubleByte(cal)
 	c.pc = addr
 }
