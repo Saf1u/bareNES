@@ -12,4 +12,5 @@ func main() {
 	// fmt.Printf("%b", cpu.Acc())
 	// fmt.Println()
 	// fmt.Printf("%b", cpu.Stat())
+
 }

@@ -18,7 +18,7 @@ const STACK uint16 = 0
 var programLength int
 
 //num of bytes to move pc depending on instruction
-var pcIncrement = map[uint8]int{
+var pcIncrement = map[uint8]uint16{
 	0x69: 2, 0x65: 2, 0x75: 2, 0x6D: 3, 0x7D: 3, 0x79: 3, 0x61: 2, 0x71: 2,
 	0x29: 2, 0x25: 2, 0x35: 2, 0x2D: 3, 0x3D: 3, 0x39: 3, 0x21: 2, 0x31: 2,
 	0x0A: 1, 0x06: 2, 0x16: 2, 0x0E: 3, 0x1E: 3,
@@ -83,6 +83,7 @@ const (
 	ZERO_PAGE_X    = "zpx"
 	ABSOLUTE       = "abs"
 	ZERO_PAGE_Y    = "zpy"
+	ZERO_PAGE      = "zpg"
 	ABSOLUTE_X     = "absx"
 	ABSOLUTE_Y     = "absy"
 	INDIRECT_X     = "indx"
@@ -93,7 +94,9 @@ const (
 	BREAK_FLAG     = 4
 	OVERFLOW_FLAG  = 6
 	NEGATIVE_FLAG  = 7
+	INDIRECT       = "ind"
 )
+const LOAD_LOCATION uint16 = 0xFC
 const STACK_PAGE uint16 = 0x0100
 
 func (c *Cpu) Acc() uint8 {
@@ -114,36 +117,41 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
 	switch {
 	case mode == IMMEDIATE:
-		dataLocation = c.pc
+		dataLocation = c.pc+1
 	case mode == ZERO_PAGE_X:
-		dataLocation = uint16(c.ReadSingleByte(c.pc))
+		dataLocation = uint16(c.ReadSingleByte(c.pc+1))
 	case mode == ABSOLUTE_X:
-		dataLocation = c.ReadDoubleByte(c.pc)
+		dataLocation = c.ReadDoubleByte(c.pc+1)
 	case mode == ZERO_PAGE_X:
-		data := c.ReadSingleByte(c.pc)
+		data := c.ReadSingleByte(c.pc+1)
 		var c uint8 = data + c.xRegister
 		dataLocation = uint16(c)
 	case mode == ZERO_PAGE_Y:
-		data := c.ReadSingleByte(c.pc)
+		data := c.ReadSingleByte(c.pc+1)
 		var c uint8 = data + c.yRegister
 		dataLocation = uint16(c)
 	case mode == ABSOLUTE_X:
-		data := c.ReadDoubleByte(c.pc)
+		data := c.ReadDoubleByte(c.pc+1)
 		dataLocation = data + uint16(c.xRegister)
 	case mode == ABSOLUTE_Y:
-		data := c.ReadDoubleByte(c.pc)
+		data := c.ReadDoubleByte(c.pc+1)
 		dataLocation = data + uint16(c.yRegister)
 	case mode == INDIRECT_X:
-		base := c.ReadSingleByte(c.pc) + c.xRegister
+		base := c.ReadSingleByte(c.pc+1) + c.xRegister
 		low := uint16(c.ReadSingleByte(uint16(base)))
 		hi := uint16(c.ReadSingleByte(uint16(base) + 1))
 		dataLocation = (hi << 8) | low
 	case mode == INDRECT_Y:
-		pos := uint16(c.ReadSingleByte(c.pc))
+		pos := uint16(c.ReadSingleByte(c.pc+1))
 		low := c.ReadSingleByte(pos)
 		hi := c.ReadSingleByte(pos + 1)
 		loc := uint16(hi)<<8 | uint16(low)
 		dataLocation = loc + uint16(c.yRegister)
+	case mode == ZERO_PAGE:
+		data := c.ReadSingleByte(c.pc+1)
+		dataLocation = uint16(data)
+	case mode == INDIRECT:
+		dataLocation = c.ReadDoubleByte(c.pc+1)
 
 	}
 	return dataLocation
@@ -226,6 +234,10 @@ func (c *Cpu) LDY(mode string) {
 
 	c.xRegister = data
 }
+func (c *Cpu) SBC(mode string) {
+	//STUBBED
+}
+
 func (c *Cpu) ADC(mode string) {
 	loc := c.addrMode(mode)
 	data := c.ReadSingleByte(loc)
@@ -239,12 +251,24 @@ func (c *Cpu) ADC(mode string) {
 	} else {
 		if (hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
 			c.SetOverflow()
-		}else{
-			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
-				c.SetOverflow()
+		} else {
+			c.CLV()
+			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) || (hasBit(c.aRegister, 7) && !hasBit(data, 7)) {
+				if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
+					c.SEC()
+				} else {
+					c.CLC()
+				}
 			}
 		}
 
+	}
+	c.aRegister = temp
+	if c.aRegister == 0 {
+		c.SetZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
 	}
 }
 
@@ -643,9 +667,9 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 func (c *Cpu) JMP(mode string) {
 
 	if mode == ABSOLUTE {
-		c.pc = c.ReadDoubleByte(c.pc)
+		c.pc = c.ReadDoubleByte(c.pc+1)
 	} else {
-		loc := c.ReadDoubleByte(c.pc)
+		loc := c.ReadDoubleByte(c.pc+1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
 		//
 		if loc&0x00ff == 0x00ff {
@@ -990,15 +1014,6 @@ func (c *Cpu) Pop() uint8 {
 	return temp
 }
 
-func (c *Cpu) incrementPassInstruction(inst uint8) {
-	inc := uint16(pcIncrement[inst]) - 1
-	c.pc = c.pc + inc
-}
-
-func (c *Cpu) run() {
-
-}
-
 //WriteSingleByte writes single byte to mem
 func (c *Cpu) WriteSingleByte(addr uint16, data uint8) {
 
@@ -1029,9 +1044,325 @@ func (c *Cpu) LoadToRomandStart(data []uint8) {
 	programLength = programLocation + len(data)
 	c.LoadToRom(data)
 	c.set()
-	c.run()
+	c.Run()
 }
 func (c *Cpu) LoadToMem(data []uint8) {
-	copy(c.mem[0xFC:0xFC+len(data)], data)
+	copy(c.mem[LOAD_LOCATION:LOAD_LOCATION+uint16(len(data))], data)
+
+}
+
+func (c *Cpu) Run() {
+	c.pc = LOAD_LOCATION
+	for {
+		temp := c.pc
+
+		switch temp {
+		case 0x00:
+			c.BRK()
+		case 0x10:
+			c.BPL()
+		case 0x20:
+			c.JSR()
+		case 0x30:
+			c.BMI()
+		case 0x40:
+			c.RTI()
+		case 0x50:
+			c.BVC()
+		case 0x60:
+			c.RTS()
+		case 0x70:
+			c.BVC()
+		case 0x90:
+			c.BCC()
+		case 0xA0:
+			c.LDY(IMMEDIATE)
+		case 0xB0:
+			c.BCS()
+		case 0xC0:
+			c.CPY(IMMEDIATE)
+		case 0xD0:
+			c.BNE()
+		case 0xE0:
+			c.CPX(IMMEDIATE)
+		case 0xF0:
+			c.BEQ()
+		case 0x01:
+			c.ORA(INDIRECT_X)
+		case 0x11:
+			c.ORA(INDRECT_Y)
+		case 0x21:
+			c.AND(INDIRECT_X)
+		case 0x31:
+			c.AND(INDRECT_Y)
+		case 0x41:
+			c.EOR(INDIRECT_X)
+		case 0x51:
+			c.EOR(INDRECT_Y)
+		case 0x61:
+			c.ADC(INDIRECT_X)
+		case 0x71:
+			c.ADC(INDRECT_Y)
+		case 0x81:
+			c.STA(INDIRECT_X)
+		case 0x91:
+			c.STA(INDRECT_Y)
+		case 0xA1:
+			c.LDA(INDIRECT_X)
+		case 0xB1:
+			c.LDA(INDRECT_Y)
+		case 0xc1:
+			c.CMP(INDIRECT_X)
+		case 0xd1:
+			c.CMP(INDRECT_Y)
+		case 0xe1:
+			c.SBC(INDIRECT_X)
+		case 0xf1:
+			c.SBC(INDRECT_Y)
+		case 0xA2:
+			c.LDX(IMMEDIATE)
+		case 0x24:
+			c.BIT(ZERO_PAGE)
+		case 0x84:
+			c.STY(ZERO_PAGE)
+		case 0x94:
+			c.STY(ZERO_PAGE_X)
+		case 0xA4:
+			c.LDY(ZERO_PAGE)
+		case 0xB4:
+			c.LDY(ZERO_PAGE_X)
+		case 0xC4:
+			c.CPY(ZERO_PAGE)
+		case 0xe4:
+			c.CPX(ZERO_PAGE)
+		case 0x05:
+			c.ORA(ZERO_PAGE)
+		case 0x15:
+			c.ORA(ZERO_PAGE_X)
+		case 0x25:
+			c.AND(ZERO_PAGE)
+		case 0x35:
+			c.AND(ZERO_PAGE_X)
+		case 0x45:
+			c.EOR(ZERO_PAGE)
+		case 0x55:
+			c.EOR(ZERO_PAGE_X)
+		case 0x65:
+			c.ADC(ZERO_PAGE)
+		case 0x75:
+			c.ADC(ZERO_PAGE_X)
+		case 0x85:
+			c.STA(ZERO_PAGE)
+		case 0x95:
+			c.STA(ZERO_PAGE_X)
+		case 0xA5:
+			c.LDA(ZERO_PAGE)
+		case 0xB5:
+			c.LDA(ZERO_PAGE_X)
+		case 0xc5:
+			c.CMP(ZERO_PAGE)
+		case 0xd5:
+			c.CMP(ZERO_PAGE_X)
+		case 0xe5:
+			c.SBC(ZERO_PAGE)
+		case 0xf5:
+			c.SBC(ZERO_PAGE_X)
+		case 0x06:
+			c.ASL(ZERO_PAGE)
+		case 0x16:
+			c.ASL(ZERO_PAGE_X)
+		case 0x26:
+			c.ROL(ZERO_PAGE)
+		case 0x36:
+			c.ROL(ZERO_PAGE_X)
+		case 0x46:
+			c.LSR(ZERO_PAGE)
+		case 0x56:
+			c.LSR(ZERO_PAGE_X)
+		case 0x66:
+			c.ROR(ZERO_PAGE)
+		case 0x76:
+			c.ROR(ZERO_PAGE_X)
+		case 0x86:
+			c.STX(ZERO_PAGE)
+		case 0x96:
+			c.STX(ZERO_PAGE_Y)
+		case 0xA6:
+			c.LDX(ZERO_PAGE)
+		case 0xB6:
+			c.LDX(ZERO_PAGE_Y)
+		case 0xc6:
+			c.DEC(ZERO_PAGE)
+		case 0xd6:
+			c.DEC(ZERO_PAGE_X)
+		case 0xe6:
+			c.INC(ZERO_PAGE)
+		case 0xf6:
+			c.INC(ZERO_PAGE_X)
+		case 0x08:
+			c.PHP()
+		case 0x18:
+			c.CLC()
+		case 0x28:
+			c.PLP()
+		case 0x38:
+			c.SEC()
+		case 0x48:
+			c.PHA()
+		case 0x58:
+			c.CLI()
+		case 0x68:
+			c.PLA()
+		case 0x78:
+			c.SEI()
+		case 0x88:
+			c.DEY()
+		case 0x98:
+			c.TYA()
+		case 0xA8:
+			c.TAY()
+		case 0xB8:
+			c.CLV()
+		case 0xc8:
+			c.INY()
+		case 0xD8:
+			//lmao no decimal mode
+		case 0xE8:
+			c.INX()
+		case 0xF8:
+			//lmao no decimal mode
+		case 0x09:
+			c.ORA(IMMEDIATE)
+		case 0x19:
+			c.ORA(ABSOLUTE_Y)
+		case 0x29:
+			c.AND(IMMEDIATE)
+		case 0x39:
+			c.AND(ABSOLUTE_Y)
+		case 0x49:
+			c.EOR(IMMEDIATE)
+		case 0x59:
+			c.EOR(ABSOLUTE_Y)
+		case 0x69:
+			c.ADC(IMMEDIATE)
+		case 0x79:
+			c.ADC(ABSOLUTE_Y)
+		case 0x99:
+			c.STA(ABSOLUTE_Y)
+		case 0xa9:
+			c.LDA(IMMEDIATE)
+		case 0xb9:
+			c.LDA(ABSOLUTE_Y)
+		case 0xc9:
+			c.CMP(IMMEDIATE)
+		case 0xd9:
+			c.CMP(ABSOLUTE_Y)
+		case 0xe9:
+			c.SBC(IMMEDIATE)
+		case 0xf9:
+			c.SBC(ABSOLUTE_Y)
+		case 0x0a:
+			c.ASL(ACCUMULATOR)
+		case 0x2a:
+			c.ROL(ACCUMULATOR)
+		case 0x4a:
+			c.LSR(ACCUMULATOR)
+		case 0x6a:
+			c.ROR(ACCUMULATOR)
+		case 0x8a:
+			c.TXA()
+		case 0x9a:
+			c.TXS()
+		case 0xAa:
+			c.TAX()
+		case 0xba:
+			c.TSX()
+		case 0xca:
+			c.DEX()
+		case 0xea:
+		case 0x2c:
+			c.BIT(ABSOLUTE)
+		case 0x4c:
+			c.JMP(ABSOLUTE)
+		case 0x6c:
+			c.JMP(INDIRECT)
+		case 0x8c:
+			c.STY(ABSOLUTE)
+		case 0xac:
+			c.LDY(ABSOLUTE)
+		case 0xbc:
+			c.LDY(ABSOLUTE_X)
+		case 0xcc:
+			c.CPY(ABSOLUTE)
+		case 0xec:
+			c.CPX(ABSOLUTE)
+		case 0x1d:
+			c.CPX(ABSOLUTE_X)
+		case 0x2d:
+			c.AND(ABSOLUTE)
+		case 0x3d:
+			c.AND(ABSOLUTE_X)
+		case 0x4d:
+			c.EOR(ABSOLUTE)
+		case 0x5d:
+			c.EOR(ABSOLUTE_X)
+		case 0x6d:
+			c.ADC(ABSOLUTE)
+		case 0x7d:
+			c.ADC(ABSOLUTE_X)
+		case 0x8d:
+			c.STA(ABSOLUTE)
+		case 0x9d:
+			c.STA(ABSOLUTE_X)
+		case 0xAd:
+			c.LDA(ABSOLUTE)
+		case 0xBd:
+			c.LDA(ABSOLUTE_X)
+		case 0xCd:
+			c.CMP(ABSOLUTE)
+		case 0xDd:
+			c.CMP(ABSOLUTE_X)
+		case 0xEd:
+			c.SBC(ABSOLUTE)
+		case 0xFd:
+			c.SBC(ABSOLUTE_X)
+		case 0x0e:
+			c.ASL(ABSOLUTE)
+		case 0x1e:
+			c.ASL(ABSOLUTE_X)
+		case 0x2e:
+			c.ROL(ABSOLUTE)
+		case 0x3e:
+			c.ROL(ABSOLUTE_X)
+		case 0x4e:
+			c.LSR(ABSOLUTE)
+		case 0x5e:
+			c.LSR(ABSOLUTE_X)
+		case 0x6e:
+			c.ROR(ABSOLUTE)
+		case 0x7e:
+			c.ROR(ABSOLUTE_X)
+		case 0x8e:
+			c.STX(ABSOLUTE)
+		case 0xae:
+			c.LDX(ABSOLUTE)
+		case 0xbe:
+			c.LDX(ABSOLUTE_Y)
+		case 0xce:
+			c.DEC(ABSOLUTE)
+		case 0xde:
+			c.DEC(ABSOLUTE_X)
+		case 0xee:
+			c.INC(ABSOLUTE)
+		case 0xfe:
+			c.INC(ABSOLUTE_X)
+		}
+		
+		if c.pc == temp {
+			length := pcIncrement[c.mem[c.pc]]
+			c.pc = c.pc + (length-1)
+
+		}
+	}
 
 }
