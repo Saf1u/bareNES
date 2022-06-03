@@ -1,5 +1,7 @@
 package cpu
 
+import "fmt"
+
 const programLocation = 0x8000
 
 //Cpu composes of a 6502 register set and addressable memory
@@ -15,7 +17,7 @@ type Cpu struct {
 
 const STACK uint16 = 0
 
-var programLength int
+var programLength uint16
 
 //num of bytes to move pc depending on instruction
 var pcIncrement = map[uint8]uint16{
@@ -117,24 +119,24 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
 	switch {
 	case mode == IMMEDIATE:
-		dataLocation = c.pc+1
+		dataLocation = c.pc + 1
 	case mode == ZERO_PAGE_X:
-		dataLocation = uint16(c.ReadSingleByte(c.pc+1))
+		dataLocation = uint16(c.ReadSingleByte(c.pc + 1))
 	case mode == ABSOLUTE_X:
-		dataLocation = c.ReadDoubleByte(c.pc+1)
+		dataLocation = c.ReadDoubleByte(c.pc + 1)
 	case mode == ZERO_PAGE_X:
-		data := c.ReadSingleByte(c.pc+1)
+		data := c.ReadSingleByte(c.pc + 1)
 		var c uint8 = data + c.xRegister
 		dataLocation = uint16(c)
 	case mode == ZERO_PAGE_Y:
-		data := c.ReadSingleByte(c.pc+1)
+		data := c.ReadSingleByte(c.pc + 1)
 		var c uint8 = data + c.yRegister
 		dataLocation = uint16(c)
 	case mode == ABSOLUTE_X:
-		data := c.ReadDoubleByte(c.pc+1)
+		data := c.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.xRegister)
 	case mode == ABSOLUTE_Y:
-		data := c.ReadDoubleByte(c.pc+1)
+		data := c.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.yRegister)
 	case mode == INDIRECT_X:
 		base := c.ReadSingleByte(c.pc+1) + c.xRegister
@@ -142,16 +144,16 @@ func (c *Cpu) addrMode(mode string) uint16 {
 		hi := uint16(c.ReadSingleByte(uint16(base) + 1))
 		dataLocation = (hi << 8) | low
 	case mode == INDRECT_Y:
-		pos := uint16(c.ReadSingleByte(c.pc+1))
+		pos := uint16(c.ReadSingleByte(c.pc + 1))
 		low := c.ReadSingleByte(pos)
 		hi := c.ReadSingleByte(pos + 1)
 		loc := uint16(hi)<<8 | uint16(low)
 		dataLocation = loc + uint16(c.yRegister)
 	case mode == ZERO_PAGE:
-		data := c.ReadSingleByte(c.pc+1)
+		data := c.ReadSingleByte(c.pc + 1)
 		dataLocation = uint16(data)
 	case mode == INDIRECT:
-		dataLocation = c.ReadDoubleByte(c.pc+1)
+		dataLocation = c.ReadDoubleByte(c.pc + 1)
 
 	}
 	return dataLocation
@@ -667,9 +669,9 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 func (c *Cpu) JMP(mode string) {
 
 	if mode == ABSOLUTE {
-		c.pc = c.ReadDoubleByte(c.pc+1)
+		c.pc = c.ReadDoubleByte(c.pc + 1)
 	} else {
-		loc := c.ReadDoubleByte(c.pc+1)
+		loc := c.ReadDoubleByte(c.pc + 1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
 		//
 		if loc&0x00ff == 0x00ff {
@@ -805,7 +807,7 @@ func (c *Cpu) BRK() {
 }
 func (c *Cpu) JSR() {
 	//we need to make sure we increment within the same cycle
-	c.Push16(c.pc + 2)
+	c.Push16(c.pc + 3)
 	cal := c.addrMode(IMMEDIATE)
 	addr := c.ReadDoubleByte(cal)
 	c.pc = addr
@@ -1040,23 +1042,21 @@ func (c *Cpu) LoadToRom(data []uint8) {
 	c.WriteDoubleByte(0xFFFC, programLocation)
 }
 
-func (c *Cpu) LoadToRomandStart(data []uint8) {
-	programLength = programLocation + len(data)
-	c.LoadToRom(data)
-	c.set()
-	c.Run()
-}
 func (c *Cpu) LoadToMem(data []uint8) {
-	copy(c.mem[LOAD_LOCATION:LOAD_LOCATION+uint16(len(data))], data)
+	programLength = LOAD_LOCATION + uint16(len(data))
+	copy(c.mem[LOAD_LOCATION:programLength], data)
 
 }
 
 func (c *Cpu) Run() {
 	c.pc = LOAD_LOCATION
-	for {
+	for c.pc < programLength {
+	
 		temp := c.pc
-
-		switch temp {
+		location := c.mem[c.pc]
+		fmt.Printf("%x\n", location)
+		
+		switch location {
 		case 0x00:
 			c.BRK()
 		case 0x10:
@@ -1357,10 +1357,10 @@ func (c *Cpu) Run() {
 		case 0xfe:
 			c.INC(ABSOLUTE_X)
 		}
-		
+
 		if c.pc == temp {
 			length := pcIncrement[c.mem[c.pc]]
-			c.pc = c.pc + (length-1)
+			c.pc = c.pc + (length)
 
 		}
 	}
