@@ -1,8 +1,9 @@
 package cpu
 
-import "fmt"
+const programLocation = 0x0000
 
-const programLocation = 0x8000
+//should be 0x0600
+const pcStart = 0xFFFC
 
 //Cpu composes of a 6502 register set and addressable memory
 type Cpu struct {
@@ -15,7 +16,7 @@ type Cpu struct {
 	mem            [0xFFFF]uint8
 }
 
-const STACK uint16 = 0
+const STACK uint8 = 0xff
 
 var programLength uint16
 
@@ -120,8 +121,6 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	switch {
 	case mode == IMMEDIATE:
 		dataLocation = c.pc + 1
-	case mode == ZERO_PAGE_X:
-		dataLocation = uint16(c.ReadSingleByte(c.pc + 1))
 	case mode == ABSOLUTE_X:
 		dataLocation = c.ReadDoubleByte(c.pc + 1)
 	case mode == ZERO_PAGE_X:
@@ -160,11 +159,13 @@ func (c *Cpu) addrMode(mode string) uint16 {
 }
 
 func (c *Cpu) set() {
+	c.WriteDoubleByte(pcStart, programLocation)
+	c.pc = c.ReadDoubleByte(pcStart)
 	c.xRegister = 0
 	c.aRegister = 0
 	c.yRegister = 0
-	c.pc = c.ReadDoubleByte(0xfffc)
 	c.statusRegister = 0
+	c.stackPtr = STACK
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
@@ -275,7 +276,9 @@ func (c *Cpu) ADC(mode string) {
 }
 
 func (c *Cpu) STA(mode string) {
+
 	loc := c.addrMode(mode)
+
 	c.WriteSingleByte(loc, c.aRegister)
 }
 func (c *Cpu) STX(mode string) {
@@ -289,20 +292,17 @@ func (c *Cpu) STY(mode string) {
 func (c *Cpu) TAX() {
 	data := c.aRegister
 	c.alterZeroAndNeg(data)
-
 	c.xRegister = data
 }
 func (c *Cpu) TAY() {
 	data := c.aRegister
 	c.alterZeroAndNeg(data)
-
 	c.yRegister = data
 }
 
 func (c *Cpu) TXA() {
 	data := c.xRegister
 	c.alterZeroAndNeg(data)
-
 	c.aRegister = data
 }
 func (c *Cpu) TYA() {
@@ -314,9 +314,6 @@ func (c *Cpu) TYA() {
 func (c *Cpu) TXS() {
 	data := c.xRegister
 	c.stackPtr = data
-}
-func (c *Cpu) stackIncrement() uint16 {
-	return uint16(c.stackPtr) + STACK_PAGE
 }
 
 func (c *Cpu) TSX() {
@@ -352,60 +349,25 @@ func (c *Cpu) EOR(mode string) {
 
 func (c *Cpu) INX() {
 	c.xRegister++
-	if c.xRegister == 0 {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(c.xRegister, 7) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
+	c.alterZeroAndNeg(c.xRegister)
 
 }
 func (c *Cpu) INY() {
 	c.yRegister++
-	if c.yRegister == 0 {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(c.yRegister, 7) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
+	c.alterZeroAndNeg(c.yRegister)
 
 }
 
 func (c *Cpu) DEX() {
+
 	c.xRegister--
-	if c.xRegister == 0 {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(c.xRegister, 7) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
+	c.alterZeroAndNeg(c.xRegister)
 
 }
 
 func (c *Cpu) DEY() {
 	c.yRegister--
-	if c.yRegister == 0 {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(c.yRegister, 7) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
+	c.alterZeroAndNeg(c.yRegister)
 
 }
 
@@ -690,8 +652,9 @@ func (c *Cpu) BMI() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if hasBit(c.statusRegister, 7) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -700,8 +663,9 @@ func (c *Cpu) BPL() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if !hasBit(c.statusRegister, 7) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -711,8 +675,9 @@ func (c *Cpu) BVS() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if hasBit(c.statusRegister, 6) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -722,8 +687,9 @@ func (c *Cpu) BVC() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if !hasBit(c.statusRegister, 6) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -734,6 +700,7 @@ func (c *Cpu) BCC() {
 	toJump := int8(c.ReadSingleByte(loc))
 	c.pc++
 	if !hasBit(c.statusRegister, 0) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -742,8 +709,9 @@ func (c *Cpu) BEQ() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if hasBit(c.statusRegister, 1) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -752,8 +720,9 @@ func (c *Cpu) BCS() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if hasBit(c.statusRegister, 0) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -762,8 +731,9 @@ func (c *Cpu) BNE() {
 	loc := c.addrMode(IMMEDIATE)
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.ReadSingleByte(loc))
-	c.pc++
+
 	if !hasBit(c.statusRegister, 1) {
+		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
@@ -778,15 +748,7 @@ func (c *Cpu) PHP() {
 }
 func (c *Cpu) PLA() {
 	acc := c.Pop()
-	if acc == 0 {
-		c.SetZero()
-	} else {
-		if hasBit(acc, 7) {
-			c.SetNegative()
-		} else {
-			c.ClearNegative()
-		}
-	}
+	c.alterZeroAndNeg(acc)
 	c.aRegister = acc
 }
 func (c *Cpu) RTI() {
@@ -799,10 +761,7 @@ func (c *Cpu) RTI() {
 }
 func (c *Cpu) BRK() {
 	c.Push(c.statusRegister)
-	hi := uint8(c.pc >> 8)
-	lo := uint8(c.pc & 0b0000000011111111)
-	c.Push(hi)
-	c.Push(lo)
+	c.Push16(c.pc)
 	c.SEI()
 }
 func (c *Cpu) JSR() {
@@ -810,27 +769,24 @@ func (c *Cpu) JSR() {
 	c.Push16(c.pc + 3)
 	cal := c.addrMode(IMMEDIATE)
 	addr := c.ReadDoubleByte(cal)
+
 	c.pc = addr
 }
 func (c *Cpu) RTS() {
 	val := c.Pop16()
-	c.pc = val + 1
+	c.pc = val
 
 }
 
 func (c *Cpu) PLP() {
 	reg := c.Pop()
-	if reg == 0 {
-		c.SetZero()
-	} else {
-		if hasBit(reg, 7) {
-			c.SetNegative()
-		} else {
-			c.ClearNegative()
-		}
-	}
 	c.statusRegister = reg
 }
+
+/*
+Illegal
+opcodes to DO
+
 
 // func(c *Cpu) DCP(mode string){
 // 	loc:=c.addrMode(mode)
@@ -972,6 +928,7 @@ func (c *Cpu) subfromA(data uint8) {
 	}
 
 }
+*/
 
 func (c *Cpu) LDA(mode string) {
 	loc := c.addrMode(mode)
@@ -991,7 +948,7 @@ func (c *Cpu) LDA(mode string) {
 }
 
 func (c *Cpu) Push(val uint8) {
-	loc := STACK + uint16(c.stackPtr)
+	loc := uint16(c.stackPtr)
 	c.mem[loc] = val
 	c.stackPtr--
 }
@@ -1010,7 +967,7 @@ func (c *Cpu) Pop16() uint16 {
 func (c *Cpu) Pop() uint8 {
 	c.stackPtr++
 	//stack grows down
-	loc := STACK + uint16(c.stackPtr)
+	loc := uint16(c.stackPtr)
 	temp := c.mem[loc]
 	c.mem[loc] = 0
 	return temp
@@ -1037,28 +994,22 @@ func (c *Cpu) WriteDoubleByte(addr uint16, data uint16) {
 
 }
 
-func (c *Cpu) LoadToRom(data []uint8) {
-	copy(c.mem[programLocation:programLocation+len(data)], data)
-	c.WriteDoubleByte(0xFFFC, programLocation)
-}
-
 func (c *Cpu) LoadToMem(data []uint8) {
-	programLength = LOAD_LOCATION + uint16(len(data))
-	copy(c.mem[LOAD_LOCATION:programLength], data)
+	programLength = programLocation + uint16(len(data))
+	copy(c.mem[programLocation:programLength], data)
 
 }
 
 func (c *Cpu) Run() {
-	c.pc = LOAD_LOCATION
+	c.set()
 	for c.pc < programLength {
-	
+
 		temp := c.pc
 		location := c.mem[c.pc]
-		fmt.Printf("%x\n", location)
-		
 		switch location {
 		case 0x00:
 			c.BRK()
+			return
 		case 0x10:
 			c.BPL()
 		case 0x20:
