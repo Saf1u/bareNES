@@ -1,8 +1,9 @@
 package cpu
 
-const programLocation = 0x0000
+//should be 0x0600??
+const programLocation =  0x0600
 
-//should be 0x0600
+
 const pcStart = 0xFFFC
 
 //Cpu composes of a 6502 register set and addressable memory
