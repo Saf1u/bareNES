@@ -11,6 +11,11 @@ func clearBit(n uint8, pos int) uint8 {
 	n &= mask
 	return n
 }
+func clearBit16(n uint16, pos int) uint16 {
+	var mask uint16 = ^(1 << pos)
+	n &= mask
+	return n
+}
 
 func hasBit(n uint8, pos int) bool {
 	val := n & (1 << pos)
