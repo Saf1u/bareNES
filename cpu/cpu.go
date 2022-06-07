@@ -1,8 +1,11 @@
 package cpu
 
-//should be 0x0600??
-const programLocation =  0x0600
+import (
+	"fmt"
+)
 
+//should be 0x0600??
+const programLocation = 0x0600
 
 const pcStart = 0xFFFC
 
@@ -40,7 +43,7 @@ const (
 	NEGATIVE_FLAG  = 7
 	INDIRECT       = "ind"
 )
-const LOAD_LOCATION uint16 = 0xFC
+
 const STACK_PAGE uint16 = 0x0100
 
 func (c *Cpu) Acc() uint8 {
@@ -50,78 +53,160 @@ func (c *Cpu) Stat() uint8 {
 	return c.statusRegister
 }
 
+func getInst(opcode uint8) string {
+	return "LDA"
+}
+func (c *Cpu) preetyprintSingle() {
+	dataLocation := c.pc + 1
+	data := c.cpuBus.ReadSingleByte(dataLocation)
+	opcode := c.cpuBus.ReadSingleByte(c.pc)
+	fmt.Printf("%x	%x %x	%s ", c.pc, opcode, data, getInst(opcode))
+
+}
+func (c *Cpu) preetyprintImplied() {
+	opcode := c.cpuBus.ReadSingleByte(c.pc)
+	fmt.Printf("%x     %x	%s ", c.pc, opcode, getInst(opcode))
+
+}
+func (c *Cpu) preetyprintDouble() {
+	dataLocation := c.pc + 1
+	data := c.cpuBus.ReadSingleByte(dataLocation)
+	dataB := c.cpuBus.ReadSingleByte(dataLocation + 1)
+	opcode := c.cpuBus.ReadSingleByte(c.pc)
+	fmt.Printf("%x	%x %x %x	%s ", c.pc, opcode, data, dataB, getInst(opcode))
+
+}
+
 func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
 	switch {
 	case mode == IMMEDIATE:
 		dataLocation = c.pc + 1
-	case mode == ABSOLUTE_X:
+		data := c.cpuBus.ReadSingleByte(dataLocation)
+		c.preetyprintSingle()
+		fmt.Printf("#$%x, ", data)
+
+	case mode == ABSOLUTE:
+		c.preetyprintDouble()
 		dataLocation = c.cpuBus.ReadDoubleByte(c.pc + 1)
+		fmt.Printf("%x,=", dataLocation)
+		fmt.Printf("$%x, ", c.cpuBus.ReadSingleByte(dataLocation))
+
 	case mode == ZERO_PAGE_X:
+		c.preetyprintSingle()
 		data := c.cpuBus.ReadSingleByte(c.pc + 1)
-		var c uint8 = data + c.xRegister
-		dataLocation = uint16(c)
+		var n uint8 = data + c.xRegister
+		fmt.Printf("$%x,X@ %x,=", data, n)
+		dataLocation = uint16(n)
+		fmt.Printf("$%x, ", c.cpuBus.ReadSingleByte(dataLocation))
+
 	case mode == ZERO_PAGE_Y:
+		c.preetyprintSingle()
 		data := c.cpuBus.ReadSingleByte(c.pc + 1)
-		var c uint8 = data + c.yRegister
-		dataLocation = uint16(c)
+		var n uint8 = data + c.yRegister
+		fmt.Printf("$%x,Y@ %x,=", data, n)
+		dataLocation = uint16(n)
+		fmt.Printf("$%x, ", c.cpuBus.ReadSingleByte(dataLocation))
+
 	case mode == ABSOLUTE_X:
+		c.preetyprintDouble()
 		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.xRegister)
+		fmt.Printf("$%x,X@ %x,=", data, dataLocation)
+		fmt.Printf("$%x, ", c.cpuBus.ReadSingleByte(dataLocation))
+
 	case mode == ABSOLUTE_Y:
+		c.preetyprintDouble()
 		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.yRegister)
+		fmt.Printf("$%x,Y@ %x,=", data, dataLocation)
+		fmt.Printf("$%x, ", c.cpuBus.ReadSingleByte(dataLocation))
+
 	case mode == INDIRECT_X:
+		c.preetyprintSingle()
+		fmt.Printf("($%x,X) @", c.cpuBus.ReadSingleByte(c.pc+1))
 		base := c.cpuBus.ReadSingleByte(c.pc+1) + c.xRegister
+		fmt.Printf(" %x =", base)
 		low := uint16(c.cpuBus.ReadSingleByte(uint16(base)))
 		hi := uint16(c.cpuBus.ReadSingleByte(uint16(base) + 1))
 		dataLocation = (hi << 8) | low
+		fmt.Printf(" %x =", dataLocation)
+		fmt.Printf(" %x", c.cpuBus.ReadSingleByte(dataLocation))
 	case mode == INDRECT_Y:
 		pos := uint16(c.cpuBus.ReadSingleByte(c.pc + 1))
 		low := c.cpuBus.ReadSingleByte(pos)
 		hi := c.cpuBus.ReadSingleByte(pos + 1)
+		c.preetyprintSingle()
+		fmt.Printf("($%x),Y = ", c.cpuBus.ReadSingleByte(c.pc+1))
 		loc := uint16(hi)<<8 | uint16(low)
+		fmt.Printf("%x @", loc)
 		dataLocation = loc + uint16(c.yRegister)
+		fmt.Printf("%x = ", dataLocation)
+		fmt.Printf("%x", c.cpuBus.ReadSingleByte(dataLocation))
 	case mode == ZERO_PAGE:
+		c.preetyprintSingle()
 		data := c.cpuBus.ReadSingleByte(c.pc + 1)
+		fmt.Printf("$%x =", data)
 		dataLocation = uint16(data)
+		fmt.Printf("%x", c.cpuBus.ReadSingleByte(dataLocation))
 	case mode == INDIRECT:
 		dataLocation = c.cpuBus.ReadDoubleByte(c.pc + 1)
 
 	}
+	c.printReg()
 	return dataLocation
 }
 
+func (c *Cpu) printReg() {
+	fmt.Printf("	A:%x X:%x Y:%x P:%x SP:%x", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+	fmt.Println()
+}
+
 func (c *Cpu) set() {
-	c.cpuBus.WriteDoubleByte(pcStart, programLocation)
-	c.pc = c.cpuBus.ReadDoubleByte(pcStart)
+
 	c.xRegister = 0
 	c.aRegister = 0
 	c.yRegister = 0
 	c.statusRegister = 0
 	c.stackPtr = STACK
+	c.cpuBus.WriteDoubleByte(pcStart, programLocation)
+	c.pc = c.cpuBus.ReadDoubleByte(pcStart)
+}
+func (c *Cpu) LoadToMem(data []uint8) {
 	c.cpuBus = bus{}
+	programLength = programLocation + uint16(len(data))
+	copy(c.cpuBus.mem[programLocation:programLength], data)
+
 }
 func (c *Cpu) SEC() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
 
 }
 func (c *Cpu) CLC() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = (clearBit(c.statusRegister, CARRY_FLAG))
 }
 func (c *Cpu) GetBit(pos int) uint8 {
 	return getBit(c.statusRegister, pos)
 }
 func (c *Cpu) SetZero() {
+
 	c.statusRegister = (setBit(c.statusRegister, ZERO_FLAG))
 }
 func (c *Cpu) ClearZero() {
 	c.statusRegister = (clearBit(c.statusRegister, ZERO_FLAG))
 }
 func (c *Cpu) SEI() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = (setBit(c.statusRegister, INTERRUPT_FLAG))
 }
 func (c *Cpu) CLI() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = (clearBit(c.statusRegister, INTERRUPT_FLAG))
 }
 func (c *Cpu) SetBreak() {
@@ -134,6 +219,8 @@ func (c *Cpu) SetOverflow() {
 	c.statusRegister = (setBit(c.statusRegister, OVERFLOW_FLAG))
 }
 func (c *Cpu) CLV() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = (clearBit(c.statusRegister, OVERFLOW_FLAG))
 }
 func (c *Cpu) SetNegative() {
@@ -225,33 +312,45 @@ func (c *Cpu) STY(mode string) {
 	c.cpuBus.WriteSingleByte(loc, c.yRegister)
 }
 func (c *Cpu) TAX() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.aRegister
 	c.alterZeroAndNeg(data)
 	c.xRegister = data
 }
 func (c *Cpu) TAY() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.aRegister
 	c.alterZeroAndNeg(data)
 	c.yRegister = data
 }
 
 func (c *Cpu) TXA() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.xRegister
 	c.alterZeroAndNeg(data)
 	c.aRegister = data
 }
 func (c *Cpu) TYA() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.yRegister
 	c.alterZeroAndNeg(data)
 
 	c.aRegister = data
 }
 func (c *Cpu) TXS() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.xRegister
 	c.stackPtr = data
 }
 
 func (c *Cpu) TSX() {
+	c.preetyprintImplied()
+	c.printReg()
 	data := c.stackPtr
 	c.alterZeroAndNeg(data)
 
@@ -283,24 +382,31 @@ func (c *Cpu) EOR(mode string) {
 }
 
 func (c *Cpu) INX() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.xRegister++
 	c.alterZeroAndNeg(c.xRegister)
 
 }
 func (c *Cpu) INY() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.yRegister++
 	c.alterZeroAndNeg(c.yRegister)
 
 }
 
 func (c *Cpu) DEX() {
-
+	c.preetyprintImplied()
+	c.printReg()
 	c.xRegister--
 	c.alterZeroAndNeg(c.xRegister)
 
 }
 
 func (c *Cpu) DEY() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.yRegister--
 	c.alterZeroAndNeg(c.yRegister)
 
@@ -418,6 +524,9 @@ func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
+		c.preetyprintImplied()
+		fmt.Print("	A")
+		c.printReg()
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -450,6 +559,9 @@ func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
+		c.preetyprintImplied()
+		fmt.Print("	A")
+		c.printReg()
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -477,6 +589,9 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
+		c.preetyprintImplied()
+		fmt.Print("	A")
+		c.printReg()
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -523,6 +638,9 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
+		c.preetyprintImplied()
+		fmt.Print("	A")
+		c.printReg()
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
@@ -564,9 +682,8 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 }
 
 func (c *Cpu) JMP(mode string) {
-
 	if mode == ABSOLUTE {
-		c.pc = c.cpuBus.ReadDoubleByte(c.pc + 1)
+		c.pc = c.addrMode(ABSOLUTE)
 	} else {
 		loc := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
@@ -584,9 +701,12 @@ func (c *Cpu) JMP(mode string) {
 }
 
 func (c *Cpu) BMI() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 
 	if hasBit(c.statusRegister, 7) {
 		c.pc = c.pc + 2
@@ -595,9 +715,12 @@ func (c *Cpu) BMI() {
 	}
 }
 func (c *Cpu) BPL() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 
 	if !hasBit(c.statusRegister, 7) {
 		c.pc = c.pc + 2
@@ -607,10 +730,12 @@ func (c *Cpu) BPL() {
 }
 
 func (c *Cpu) BVS() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if hasBit(c.statusRegister, 6) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -619,10 +744,12 @@ func (c *Cpu) BVS() {
 }
 
 func (c *Cpu) BVC() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if !hasBit(c.statusRegister, 6) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -630,10 +757,12 @@ func (c *Cpu) BVC() {
 	}
 }
 func (c *Cpu) BCC() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-	c.pc++
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if !hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -641,10 +770,13 @@ func (c *Cpu) BCC() {
 	}
 }
 func (c *Cpu) BEQ() {
-	loc := c.addrMode(IMMEDIATE)
+
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -652,10 +784,12 @@ func (c *Cpu) BEQ() {
 	}
 }
 func (c *Cpu) BCS() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -663,30 +797,50 @@ func (c *Cpu) BCS() {
 	}
 }
 func (c *Cpu) BNE() {
-	loc := c.addrMode(IMMEDIATE)
+	loc := c.pc + 1
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
-
+	c.preetyprintSingle()
+	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	c.printReg()
 	if !hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
 	}
 }
+func (c *Cpu) JSR() {
+	//we need to make sure we increment within the same cycle
+	c.Push16(c.pc + 3)
+	c.preetyprintDouble()
+	cal := c.pc + 1
+	addr := c.cpuBus.ReadDoubleByte(cal)
+	fmt.Printf("%x", addr)
+	c.printReg()
+	c.pc = addr
+}
 func (c *Cpu) PHA() {
+	c.preetyprintImplied()
+	c.printReg()
 	acc := c.Acc()
 	c.Push(acc)
 }
 func (c *Cpu) PHP() {
+	c.preetyprintImplied()
+	c.printReg()
 	reg := c.statusRegister
 	c.Push(reg)
 }
 func (c *Cpu) PLA() {
+	c.preetyprintImplied()
+	c.printReg()
 	acc := c.Pop()
 	c.alterZeroAndNeg(acc)
 	c.aRegister = acc
 }
 func (c *Cpu) RTI() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.statusRegister = c.Pop()
 	c.pc = c.Pop16()
 	if !hasBit(c.statusRegister, 2) {
@@ -695,25 +849,23 @@ func (c *Cpu) RTI() {
 
 }
 func (c *Cpu) BRK() {
+	c.preetyprintImplied()
+	c.printReg()
 	c.Push(c.statusRegister)
 	c.Push16(c.pc)
 	c.SEI()
 }
-func (c *Cpu) JSR() {
-	//we need to make sure we increment within the same cycle
-	c.Push16(c.pc + 3)
-	cal := c.addrMode(IMMEDIATE)
-	addr := c.cpuBus.ReadDoubleByte(cal)
 
-	c.pc = addr
-}
 func (c *Cpu) RTS() {
+	c.preetyprintImplied()
+	c.printReg()
 	val := c.Pop16()
 	c.pc = val
 
 }
 
 func (c *Cpu) PLP() {
+	c.preetyprintImplied()
 	reg := c.Pop()
 	c.statusRegister = reg
 }
@@ -914,51 +1066,42 @@ type bus struct {
 
 //WriteSingleByte writes single byte to mem
 func (b *bus) WriteSingleByte(addr uint16, data uint8) {
-	if addr >= 0x000 && addr <= 0x2000 {
-		addr = clearBit16(addr, 11)
-		addr = clearBit16(addr, 12)
-	}
+	//mirror(addr)
 	b.mem[addr] = data
 
 }
 
 //ReadSingleByte writes single byte to mem
 func (b *bus) ReadSingleByte(addr uint16) uint8 {
-	if addr >= 0x000 && addr <= 0x2000 {
-		addr = clearBit16(addr, 11)
-		addr = clearBit16(addr, 12)
-	}
+	//mirror(addr)
 	data := b.mem[addr]
 	return data
 }
 
 func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
-	if addr >= 0x000 && addr <= 0x2000 {
-		addr = clearBit16(addr, 11)
-		addr = clearBit16(addr, 12)
-	}
+	//mirror(addr)
 	low := uint8(data & 0x00FF)
 	b.mem[addr] = low
 	hi := uint8((data) >> 8)
 	b.mem[addr+1] = hi
 
 }
-func (b *bus) ReadDoubleByte(addr uint16) uint16 {
+func mirror(addr uint16) uint16 {
 	if addr >= 0x000 && addr <= 0x2000 {
 		addr = clearBit16(addr, 11)
 		addr = clearBit16(addr, 12)
 	}
+	return addr
+}
+func (b *bus) ReadDoubleByte(addr uint16) uint16 {
+	//mirror(addr)
 	var low uint16 = uint16(b.mem[addr])
 	var hi uint16 = uint16(b.mem[addr+1])
 	res := (hi << 8) | low
 	return res
 }
 
-func (c *Cpu) LoadToMem(data []uint8) {
-	programLength = programLocation + uint16(len(data))
-	copy(c.cpuBus.mem[programLocation:programLength], data)
 
-}
 
 func (c *Cpu) Run() {
 	c.set()

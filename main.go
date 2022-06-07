@@ -1,17 +1,9 @@
 package main
 
-import (
-	"emulator/cpu"
-)
+import "emulator/cpu"
 
 func main() {
-	// disassembler.ReadFile("code.txt")
 	cpu := &cpu.Cpu{}
-	// cpu.WriteSingleByte(0x10, 0xFF)
-	cpu.LoadToMem([]uint8{0x6C, 0xFF, 0x30})
+	cpu.LoadToMem([]uint8{0xA9,0xFF,0xA2,0x07,0x95,0x10,0xCA,0x10,0xfb})
 	cpu.Run()
-	// fmt.Printf("%b", cpu.Acc())
-	// fmt.Println()
-	// fmt.Printf("%b", cpu.Stat())
-
 }
