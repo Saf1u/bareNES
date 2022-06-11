@@ -54,18 +54,18 @@ func (c *Cpu) Stat() uint8 {
 }
 
 func getInst(opcode uint8) string {
-	return "LDA"
+	return inst[opcode]
 }
 func (c *Cpu) preetyprintSingle() {
 	dataLocation := c.pc + 1
 	data := c.cpuBus.ReadSingleByte(dataLocation)
 	opcode := c.cpuBus.ReadSingleByte(c.pc)
-	fmt.Printf("%x	%x %x	%s ", c.pc, opcode, data, getInst(opcode))
+	fmt.Printf("%04x 	%x %x	%s ", c.pc, opcode, data, getInst(opcode))
 
 }
 func (c *Cpu) preetyprintImplied() {
 	opcode := c.cpuBus.ReadSingleByte(c.pc)
-	fmt.Printf("%x     %x	%s ", c.pc, opcode, getInst(opcode))
+	fmt.Printf("%04x    %x	%s ", c.pc, opcode, getInst(opcode))
 
 }
 func (c *Cpu) preetyprintDouble() {
@@ -73,7 +73,7 @@ func (c *Cpu) preetyprintDouble() {
 	data := c.cpuBus.ReadSingleByte(dataLocation)
 	dataB := c.cpuBus.ReadSingleByte(dataLocation + 1)
 	opcode := c.cpuBus.ReadSingleByte(c.pc)
-	fmt.Printf("%x	%x %x %x	%s ", c.pc, opcode, data, dataB, getInst(opcode))
+	fmt.Printf("%04x	%x %x %x	%s ", c.pc, opcode, data, dataB, getInst(opcode))
 
 }
 
@@ -682,6 +682,7 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 }
 
 func (c *Cpu) JMP(mode string) {
+	c.preetyprintDouble()
 	if mode == ABSOLUTE {
 		c.pc = c.addrMode(ABSOLUTE)
 	} else {
@@ -692,10 +693,16 @@ func (c *Cpu) JMP(mode string) {
 			low := uint16(c.cpuBus.ReadSingleByte(loc))
 			hi := uint16(c.cpuBus.ReadSingleByte(loc & 0xFF00))
 			fin := hi<<8 | low
+			fmt.Printf("($%04x) = %04x", loc, fin)
+			c.printReg()
 			c.pc = fin
 		} else {
-			c.pc = c.cpuBus.ReadDoubleByte(loc)
+			fin := c.cpuBus.ReadDoubleByte(loc)
+			fmt.Printf("($%04x) = %x04", loc, fin)
+			c.printReg()
+			c.pc = fin
 		}
+
 	}
 
 }
@@ -705,7 +712,7 @@ func (c *Cpu) BMI() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 
 	if hasBit(c.statusRegister, 7) {
@@ -719,7 +726,7 @@ func (c *Cpu) BPL() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 
 	if !hasBit(c.statusRegister, 7) {
@@ -734,7 +741,7 @@ func (c *Cpu) BVS() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if hasBit(c.statusRegister, 6) {
 		c.pc = c.pc + 2
@@ -748,7 +755,7 @@ func (c *Cpu) BVC() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if !hasBit(c.statusRegister, 6) {
 		c.pc = c.pc + 2
@@ -761,7 +768,7 @@ func (c *Cpu) BCC() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if !hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
@@ -775,7 +782,7 @@ func (c *Cpu) BEQ() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
@@ -788,7 +795,7 @@ func (c *Cpu) BCS() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
@@ -801,7 +808,7 @@ func (c *Cpu) BNE() {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := int8(c.cpuBus.ReadSingleByte(loc))
 	c.preetyprintSingle()
-	fmt.Printf("%x", c.pc+2+uint16(toJump))
+	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
 	if !hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
@@ -815,7 +822,7 @@ func (c *Cpu) JSR() {
 	c.preetyprintDouble()
 	cal := c.pc + 1
 	addr := c.cpuBus.ReadDoubleByte(cal)
-	fmt.Printf("%x", addr)
+	fmt.Printf("$%04x", addr)
 	c.printReg()
 	c.pc = addr
 }
@@ -1100,8 +1107,6 @@ func (b *bus) ReadDoubleByte(addr uint16) uint16 {
 	res := (hi << 8) | low
 	return res
 }
-
-
 
 func (c *Cpu) Run() {
 	c.set()
