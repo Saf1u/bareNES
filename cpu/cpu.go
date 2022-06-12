@@ -2,10 +2,11 @@ package cpu
 
 import (
 	"fmt"
+	"os"
 )
 
 //should be 0x0600??
-const programLocation = 0x0600
+const programLocation = 0xc000
 
 const pcStart = 0xFFFC
 
@@ -20,7 +21,7 @@ type Cpu struct {
 	cpuBus         bus
 }
 
-const STACK uint8 = 0xff
+const STACK uint8 = 0xfd
 
 var programLength uint16
 
@@ -38,6 +39,7 @@ const (
 	CARRY_FLAG     = 0
 	ZERO_FLAG      = 1
 	INTERRUPT_FLAG = 2
+	DECIMAL_FLAG   = 3
 	BREAK_FLAG     = 4
 	OVERFLOW_FLAG  = 6
 	NEGATIVE_FLAG  = 7
@@ -167,7 +169,7 @@ func (c *Cpu) set() {
 	c.xRegister = 0
 	c.aRegister = 0
 	c.yRegister = 0
-	c.statusRegister = 0
+	c.statusRegister = 0x24
 	c.stackPtr = STACK
 	c.cpuBus.WriteDoubleByte(pcStart, programLocation)
 	c.pc = c.cpuBus.ReadDoubleByte(pcStart)
@@ -208,6 +210,16 @@ func (c *Cpu) CLI() {
 	c.preetyprintImplied()
 	c.printReg()
 	c.statusRegister = (clearBit(c.statusRegister, INTERRUPT_FLAG))
+}
+func (c *Cpu) SED() {
+	c.preetyprintImplied()
+	c.printReg()
+	c.statusRegister = (setBit(c.statusRegister, DECIMAL_FLAG))
+}
+func (c *Cpu) CLD() {
+	c.preetyprintImplied()
+	c.printReg()
+	c.statusRegister = (clearBit(c.statusRegister, DECIMAL_FLAG))
 }
 func (c *Cpu) SetBreak() {
 	c.statusRegister = (setBit(c.statusRegister, BREAK_FLAG))
@@ -260,10 +272,14 @@ func (c *Cpu) LDY(mode string) {
 	c.xRegister = data
 }
 func (c *Cpu) SBC(mode string) {
-	//STUBBED
+	fmt.Println("sub sus")
+	os.Exit(0)
+
 }
 
 func (c *Cpu) ADC(mode string) {
+	fmt.Println("add sus")
+	os.Exit(0)
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
 	temp := c.aRegister + data
@@ -402,6 +418,10 @@ func (c *Cpu) DEX() {
 	c.xRegister--
 	c.alterZeroAndNeg(c.xRegister)
 
+}
+func (c *Cpu) NOP() {
+	c.preetyprintImplied()
+	c.printReg()
 }
 
 func (c *Cpu) DEY() {
@@ -682,10 +702,11 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 }
 
 func (c *Cpu) JMP(mode string) {
-	c.preetyprintDouble()
+
 	if mode == ABSOLUTE {
 		c.pc = c.addrMode(ABSOLUTE)
 	} else {
+		c.preetyprintDouble()
 		loc := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
 		//
@@ -743,7 +764,9 @@ func (c *Cpu) BVS() {
 	c.preetyprintSingle()
 	fmt.Printf("$%04x", c.pc+2+uint16(toJump))
 	c.printReg()
+
 	if hasBit(c.statusRegister, 6) {
+
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -818,12 +841,13 @@ func (c *Cpu) BNE() {
 }
 func (c *Cpu) JSR() {
 	//we need to make sure we increment within the same cycle
-	c.Push16(c.pc + 3)
+
 	c.preetyprintDouble()
 	cal := c.pc + 1
 	addr := c.cpuBus.ReadDoubleByte(cal)
 	fmt.Printf("$%04x", addr)
 	c.printReg()
+	c.Push16(c.pc + 3)
 	c.pc = addr
 }
 func (c *Cpu) PHA() {
@@ -873,8 +897,42 @@ func (c *Cpu) RTS() {
 
 func (c *Cpu) PLP() {
 	c.preetyprintImplied()
+
+	c.printReg()
 	reg := c.Pop()
-	c.statusRegister = reg
+	
+	if hasBit(reg,NEGATIVE_FLAG){
+		c.SetNegative()
+	}else{
+		c.ClearNegative()
+	}
+
+	if hasBit(reg,OVERFLOW_FLAG){
+		c.SetOverflow()
+	}else{
+		c.statusRegister=clearBit(c.statusRegister,OVERFLOW_FLAG)
+	}
+	if hasBit(reg,DECIMAL_FLAG){
+		c.statusRegister=setBit(c.statusRegister,DECIMAL_FLAG)
+	}else{
+		c.statusRegister=clearBit(c.statusRegister,DECIMAL_FLAG)
+	}
+	if hasBit(reg,INTERRUPT_FLAG){
+		c.statusRegister=setBit(c.statusRegister,INTERRUPT_FLAG)
+	}else{
+		c.statusRegister=clearBit(c.statusRegister,INTERRUPT_FLAG)
+	}
+	if hasBit(reg,ZERO_FLAG){
+		c.statusRegister=setBit(c.statusRegister,ZERO_FLAG)
+	}else{
+		c.statusRegister=clearBit(c.statusRegister,ZERO_FLAG)
+	}
+	if hasBit(reg,CARRY_FLAG){
+		c.statusRegister=setBit(c.statusRegister,CARRY_FLAG)
+	}else{
+		c.statusRegister=clearBit(c.statusRegister,CARRY_FLAG)
+	}
+
 }
 
 /*
@@ -1131,7 +1189,7 @@ func (c *Cpu) Run() {
 		case 0x60:
 			c.RTS()
 		case 0x70:
-			c.BVC()
+			c.BVS()
 		case 0x90:
 			c.BCC()
 		case 0xA0:
@@ -1285,10 +1343,12 @@ func (c *Cpu) Run() {
 		case 0xc8:
 			c.INY()
 		case 0xD8:
+			c.CLD()
 			//lmao no decimal mode
 		case 0xE8:
 			c.INX()
 		case 0xF8:
+			c.SED()
 			//lmao no decimal mode
 		case 0x09:
 			c.ORA(IMMEDIATE)
@@ -1339,6 +1399,7 @@ func (c *Cpu) Run() {
 		case 0xca:
 			c.DEX()
 		case 0xea:
+			c.NOP()
 		case 0x2c:
 			c.BIT(ABSOLUTE)
 		case 0x4c:
@@ -1418,6 +1479,7 @@ func (c *Cpu) Run() {
 		}
 
 		if c.pc == temp {
+
 			length := pcIncrement[c.cpuBus.ReadSingleByte(c.pc)]
 			c.pc = c.pc + (length)
 
