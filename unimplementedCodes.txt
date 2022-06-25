@@ -1,0 +1,146 @@
+/*
+Illegal
+opcodes to DO
+
+
+// func(c *Cpu) DCP(mode string){
+// 	loc:=c.addrMode(mode)
+// 	data := c.ReadSingleByte(loc)
+// 	data--
+// 	c.WriteSingleByte(loc,data)
+
+// 	if data == 0 {
+// 		c.SetZero()
+// 	} else {
+// 		c.ClearZero()
+// 	}
+// 	if hasBit(data, 7) {
+// 		c.SetNegative()
+// 	} else {
+// 		c.ClearNegative()
+// 	}
+
+// }
+func (c *Cpu) RLA(mode string) {
+	var data *uint8
+	c.ROL(mode, data)
+	c.aRegister = c.aRegister & (*data)
+	c.alterZeroAndNeg(c.aRegister)
+}
+func (c *Cpu) SLA(mode string) {
+	var data *uint8
+	c.ASL(mode, data)
+	c.aRegister = c.aRegister | (*data)
+	c.alterZeroAndNeg(c.aRegister)
+}
+func (c *Cpu) SRE(mode string) {
+	var data *uint8
+	c.LSR(mode, data)
+	c.aRegister = c.aRegister ^ (*data)
+	c.alterZeroAndNeg(c.aRegister)
+
+}
+func (c *Cpu) AXS(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	c.xRegister = c.xRegister & c.aRegister
+	if data <= c.xRegister {
+		c.SEC()
+	}
+	c.xRegister = c.xRegister - data
+
+	if c.xRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.xRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+}
+func (c *Cpu) ARR(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	c.aRegister = data & c.aRegister
+	c.ROR(ACCUMULATOR)
+	temp := c.Acc()
+	if hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SEC()
+		c.CLV()
+	}
+	if !hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.CLV()
+	}
+	if hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.SetOverflow()
+	}
+	if !hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SetOverflow()
+		c.SEC()
+	}
+
+	if temp == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(temp, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+
+}
+func (c *Cpu) ANC(mode string) {
+	loc := c.addrMode(mode)
+	data := c.ReadSingleByte(loc)
+	c.aRegister = c.aRegister + data
+	c.alterZeroAndNeg(c.aRegister)
+	if hasBit(c.aRegister, 7) {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+}
+func (c *Cpu) RRA(mode string) {
+	var data *uint8
+	c.ROR(mode, data)
+	c.aRegister = c.aRegister + *data
+	c.alterZeroAndNeg(c.aRegister)
+	if hasBit(c.aRegister, 7) {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+}
+func (c *Cpu) ISB(mode string) {
+	var data *uint8
+	c.INC(mode, data)
+	c.subfromA(*data)
+
+}
+func (c *Cpu) subfromA(data uint8) {
+	c.aRegister = ((c.aRegister) + uint8(int8(data)-1))
+	///lot of questions lol
+	if c.aRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+
+}
+*/
