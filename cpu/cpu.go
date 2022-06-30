@@ -68,8 +68,8 @@ func (c *Cpu) TraceExecution(mode string) {
 	dataSingle := c.cpuBus.ReadSingleByte(dataLocation)
 	dataDouble := c.cpuBus.ReadSingleByte(dataLocation + 1)
 	opcode := c.cpuBus.ReadSingleByte(c.pc)
-	pcDoubleInst :=  "%04X %02X %02X %02X %s  "
-	pcSingleInst :=  "%04X %02X %02X    %s  "
+	pcDoubleInst := "%04X %02X %02X %02X %s  "
+	pcSingleInst := "%04X %02X %02X    %s  "
 	pcImpliedInst := "%04X %02X       %s  "
 	immediateInstruction := "#$%02X                       "
 	absoluteInstruction := "%02X =$%02X                   "
@@ -111,7 +111,7 @@ func (c *Cpu) TraceExecution(mode string) {
 			fmt.Printf(relativeInstruction, data)
 			fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
 		}
-		
+
 	case mode == ZERO_PAGE_X:
 		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
 		var n uint8 = dataSingle + c.xRegister
@@ -863,24 +863,24 @@ func (c *Cpu) PLP() {
 		c.statusRegister = clearBit(c.statusRegister, OVERFLOW_FLAG)
 	}
 	if hasBit(reg, DECIMAL_FLAG) {
-		c.statusRegister = setBit(c.statusRegister, DECIMAL_FLAG)
+		c.SED()
 	} else {
-		c.statusRegister = clearBit(c.statusRegister, DECIMAL_FLAG)
+		c.CLD()
 	}
 	if hasBit(reg, INTERRUPT_FLAG) {
-		c.statusRegister = setBit(c.statusRegister, INTERRUPT_FLAG)
+		c.SEI()
 	} else {
-		c.statusRegister = clearBit(c.statusRegister, INTERRUPT_FLAG)
+		c.CLI()
 	}
 	if hasBit(reg, ZERO_FLAG) {
-		c.statusRegister = setBit(c.statusRegister, ZERO_FLAG)
+		c.SetZero()
 	} else {
-		c.statusRegister = clearBit(c.statusRegister, ZERO_FLAG)
+		c.ClearZero()
 	}
 	if hasBit(reg, CARRY_FLAG) {
-		c.statusRegister = setBit(c.statusRegister, CARRY_FLAG)
+		c.CLC()
 	} else {
-		c.statusRegister = clearBit(c.statusRegister, CARRY_FLAG)
+		c.SEC()
 	}
 
 }

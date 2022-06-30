@@ -1,35 +1,32 @@
-package cpu_test
+package cpu
 
 import (
-	"emulator/cpu"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
 
-type cpuTestSuite struct {
-	suite.Suite
-	cpu *cpu.Cpu
+func TestReadSingleByte(t *testing.T) {
+	var low uint8 = 0b10101011
+	cpu := &Cpu{}
+	cpu.cpuBus.mem[0] = low
+	assert.Equal(t, low, cpu.cpuBus.ReadSingleByte(0))
 }
 
-func (suite *cpuTestSuite) SetupTest() {
-	suite.cpu = &cpu.Cpu{}
-	suite.cpu.LoadToMem([]uint8{0x10, 0x20, 0x30, 0xFF, 0x20})
-}
-func (suite *cpuTestSuite) TestGetBit() {
-	suite.Equal(uint8(0), suite.cpu.GetBit(1))
-
-}
-
-func (suite *cpuTestSuite) TestZeroFlag() {
-	suite.cpu.SetZero()
-	suite.Equal(uint8(1), suite.cpu.GetBit(1))
+func TestReadDoubleyte(t *testing.T) {
+	var low uint8 = 0b10101011
+	var hi uint8 = 0b10101010
+	cpu := &Cpu{}
+	cpu.cpuBus.mem[0] = low
+	cpu.cpuBus.mem[1] = hi
+	assert.Equal(t, uint16(0b1010101010101011), cpu.cpuBus.ReadDoubleByte(0))
 }
 
-func (suite *cpuTestSuite) TestLDA() {
-suite.cpu.LDA(cpu.IMMEDIATE)
-}
 
-func TestExampleTestSuite(t *testing.T) {
-	suite.Run(t, new(cpuTestSuite))
-}
+// func TestAddrMode(t *testing.T) {
+// 	t.Run("test relative", func(t *testing.T) {
+// 		cpu := &Cpu{}
+// 		cpu.pc=0
+// 		cpu.p
+// 	})
+// }
