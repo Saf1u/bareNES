@@ -39,7 +39,7 @@ const (
 	ABSOLUTE_X        = "absx"
 	ABSOLUTE_Y        = "absy"
 	INDIRECT_X        = "indx"
-	INDRECT_Y         = "indy"
+	INDIRECT_Y         = "indy"
 	CARRY_FLAG        = 0
 	ZERO_FLAG         = 1
 	INTERRUPT_FLAG    = 2
@@ -144,7 +144,7 @@ func (c *Cpu) TraceExecution(mode string) {
 		dataLocation = (hi << 8) | low
 		fmt.Printf(indirectInstructionX, dataSingle, base, dataLocation, c.cpuBus.ReadSingleByte(dataLocation))
 		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
-	case mode == INDRECT_Y:
+	case mode == INDIRECT_Y:
 		pos := uint16(dataSingle)
 		low := c.cpuBus.ReadSingleByte(pos)
 		hi := c.cpuBus.ReadSingleByte(pos + 1)
@@ -210,7 +210,7 @@ func (c *Cpu) addrMode(mode string) uint16 {
 		low := uint16(c.cpuBus.ReadSingleByte(uint16(base)))
 		hi := uint16(c.cpuBus.ReadSingleByte(uint16(base) + 1))
 		dataLocation = (hi << 8) | low
-	case mode == INDRECT_Y:
+	case mode == INDIRECT_Y:
 		pos := uint16(c.cpuBus.ReadSingleByte(c.pc + 1))
 		low := c.cpuBus.ReadSingleByte(pos)
 		hi := c.cpuBus.ReadSingleByte(pos + 1)
