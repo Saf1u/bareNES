@@ -1,0 +1,9 @@
+C000  26 D3     ROL $D3 = 00                    A:00 X:00 Y:00 P:24 SP:FD
+C002  0A        ASL A                           A:00 X:00 Y:00 P:26 SP:FD
+C003  26 D3     ROL $D3 = 00                    A:00 X:00 Y:00 P:26 SP:FD
+C005  0A        ASL A                           A:00 X:00 Y:00 P:26 SP:FD
+C006  26 D3     ROL $D3 = 00                    A:00 X:00 Y:00 P:26 SP:FD
+C008  48        PHA                             A:00 X:00 Y:00 P:26 SP:FD
+C009  A5 D3     LDA $D3 = 00                    A:00 X:00 Y:00 P:26 SP:FC
+C00B  09 20     ORA #$20                        A:00 X:00 Y:00 P:26 SP:FC
+C00D  8D 06 20  STA 

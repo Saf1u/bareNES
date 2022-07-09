@@ -1,8 +1,8 @@
 package cpu
 
 import (
+	"emulator/rom"
 	"fmt"
-	"os"
 	"strconv"
 )
 
@@ -39,7 +39,7 @@ const (
 	ABSOLUTE_X        = "absx"
 	ABSOLUTE_Y        = "absy"
 	INDIRECT_X        = "indx"
-	INDIRECT_Y         = "indy"
+	INDIRECT_Y        = "indy"
 	CARRY_FLAG        = 0
 	ZERO_FLAG         = 1
 	INTERRUPT_FLAG    = 2
@@ -68,98 +68,177 @@ func (c *Cpu) TraceExecution(mode string) {
 	dataSingle := c.cpuBus.ReadSingleByte(dataLocation)
 	dataDouble := c.cpuBus.ReadSingleByte(dataLocation + 1)
 	opcode := c.cpuBus.ReadSingleByte(c.pc)
-	pcDoubleInst := "%04X %02X %02X %02X %s  "
-	pcSingleInst := "%04X %02X %02X    %s  "
-	pcImpliedInst := "%04X %02X       %s  "
+	pcDoubleInst := "%04X  %02X %02X %02X  %s "
+	pcSingleInst := "%04X  %02X %02X     %s "
+	pcImpliedInst := "%04X  %02X        %s "
 	immediateInstruction := "#$%02X                       "
-	absoluteInstruction := "%02X =$%02X                   "
-	zeroPageXInstruction := "$%02X,X@ %02X,=$%02X,        "
-	zeroPageYInstruction := "$%02X,Y@ %02X,=$%02X,        "
-	absoluteXInstruction := "$%02X,X@ %02X,=$%02X,        "
-	absoluteYInstruction := "$%02X,Y@ %02X,=$%02X,        "
-	indirectInstructionX := "($%02X,X) @ %02X = %02X =%02X"
-	indirectInstructionY := "($%02X),Y = %02X @%02X = %02X"
+	absoluteInstruction := "$%04X = %02X                  "
+	zeroPageXInstruction := "$%02X,X @ %02X = %02X       "
+	zeroPageYInstruction := "$%02X,Y @ %02X = %02X       "
+	absoluteXInstruction := "$%04X,X @ %04X = %02X       "
+	absoluteYInstruction := "$%04X,Y @ %04X = %02X       "
+	indirectInstructionX := "($%02X,X) @ %02X = %04X = %02X"
+	indirectInstructionY := "($%02X),Y = %04X @ %04X = %02X"
 	zeroPageInstruction := "$%02X = %02X                 "
-	accumulatorInstruction := "A                            "
-	relativeInstruction := "$%04X                        "
-	indirectInstruction := "($%04X) = %04X               "
+	accumulatorInstruction := "A                           "
+	relativeInstruction := "$%04X                       "
+	indirectInstruction := "($%04X) = %04X              "
+
+	pcDoubleInstIllegal := "%04X  %02X %02X %02X %s "
+	pcSingleInstIllegal := "%04X  %02X %02X    %s "
+	pcImpliedInstIllegal := "%04X  %02X       %s "
+	absoluteInstructionIllegal := "$%04X = %02X                 "
+	relativeInstructionIllegal := "$%04X                      "
 
 	switch {
 	case mode == IMPLIED:
-		fmt.Printf(pcImpliedInst, c.pc, opcode, getInst(opcode))
-		fmt.Printf("                             A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcImpliedInstIllegal, c.pc, opcode, getInst(opcode))
+		} else {
+			fmt.Printf(pcImpliedInst, c.pc, opcode, getInst(opcode))
+		}
+		fmt.Printf("                            A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == ACCUMULATOR:
-		fmt.Printf(pcImpliedInst, c.pc, opcode, getInst(opcode))
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcImpliedInstIllegal, c.pc, opcode, getInst(opcode))
+		} else {
+			fmt.Printf(pcImpliedInst, c.pc, opcode, getInst(opcode))
+		}
 		fmt.Print(accumulatorInstruction)
 		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
 	case mode == RELATIVE:
 		toJump := dataSingle
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
-		fmt.Printf(relativeInstruction, c.pc+2+uint16(toJump))
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
+		fmt.Printf(relativeInstruction, c.pc+2+uint16(int8(toJump)))
 		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
 	case mode == IMMEDIATE:
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
-		fmt.Printf(immediateInstruction, dataSingle)
-		fmt.Printf("  A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
-	case mode == ABSOLUTE:
-		fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
-		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
-		if (opcode != 0x20) && opcode != 0x4c {
-			fmt.Printf(absoluteInstruction, data, c.cpuBus.ReadSingleByte(uint16(data)))
-			fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
 		} else {
-			fmt.Printf(relativeInstruction, data)
-			fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+
+		}
+		fmt.Printf(immediateInstruction, dataSingle)
+		fmt.Printf(" A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
+	case mode == ABSOLUTE:
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcDoubleInstIllegal, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+			data := c.cpuBus.ReadDoubleByte(c.pc + 1)
+			if (opcode != 0x20) && opcode != 0x4c {
+				fmt.Printf(absoluteInstructionIllegal, data, c.cpuBus.ReadSingleByte(uint16(data)))
+				fmt.Printf(" A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+			} else {
+				fmt.Printf(relativeInstructionIllegal, data)
+				fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
+			}
+		} else {
+			fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+			data := c.cpuBus.ReadDoubleByte(c.pc + 1)
+			if (opcode != 0x20) && opcode != 0x4c {
+				fmt.Printf(absoluteInstruction, data, c.cpuBus.ReadSingleByte(uint16(data)))
+				fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+			} else {
+				fmt.Printf(relativeInstruction, data)
+				fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
+			}
 		}
 
 	case mode == ZERO_PAGE_X:
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
 		var n uint8 = dataSingle + c.xRegister
 		dataLocation = uint16(n)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
 		fmt.Printf(zeroPageXInstruction, dataSingle, n, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("      A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == ZERO_PAGE_Y:
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
 		var n uint8 = dataSingle + c.yRegister
 		dataLocation = uint16(n)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+			fmt.Printf(zeroPageYInstruction, dataSingle, n, c.cpuBus.ReadSingleByte(dataLocation))
+			fmt.Printf("      A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
 		fmt.Printf(zeroPageYInstruction, dataSingle, n, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf(":%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("      A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == ABSOLUTE_X:
-		fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
 		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.xRegister)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcDoubleInstIllegal, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+		} else {
+			fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+		}
 		fmt.Printf(absoluteXInstruction, data, dataLocation, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("  A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == ABSOLUTE_Y:
-		fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
 		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.yRegister)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcDoubleInstIllegal, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+		} else {
+			fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
+
+		}
 		fmt.Printf(absoluteYInstruction, data, dataLocation, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("  A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == INDIRECT_X:
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
 		base := dataSingle + c.xRegister
 		low := uint16(c.cpuBus.ReadSingleByte(uint16(base)))
-		hi := uint16(c.cpuBus.ReadSingleByte(uint16(base) + 1))
+		temp := uint8(base + 1)
+		hi := uint16(c.cpuBus.ReadSingleByte(uint16(temp)))
 		dataLocation = (hi << 8) | low
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
 		fmt.Printf(indirectInstructionX, dataSingle, base, dataLocation, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("    A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == INDIRECT_Y:
 		pos := uint16(dataSingle)
 		low := c.cpuBus.ReadSingleByte(pos)
-		hi := c.cpuBus.ReadSingleByte(pos + 1)
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		temp := uint8(dataSingle + 1)
+		hi := c.cpuBus.ReadSingleByte(uint16(temp))
 		loc := uint16(hi)<<8 | uint16(low)
 		dataLocation = loc + uint16(c.yRegister)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
 		fmt.Printf(indirectInstructionY, dataSingle, loc, dataLocation, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+		fmt.Printf("  A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
 	case mode == ZERO_PAGE:
-		fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
 		data := c.cpuBus.ReadSingleByte(c.pc + 1)
 		dataLocation = uint16(data)
+		if getInst(opcode)[0:1] == "*" {
+			fmt.Printf(pcSingleInstIllegal, c.pc, opcode, dataSingle, getInst(opcode))
+		} else {
+			fmt.Printf(pcSingleInst, c.pc, opcode, dataSingle, getInst(opcode))
+		}
 		fmt.Printf(zeroPageInstruction, dataSingle, c.cpuBus.ReadSingleByte(dataLocation))
-		fmt.Printf("    A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
-	case mode == INDIRECT:
+		fmt.Printf("   A:%02X X:%02X Y:%02X P:%02X SP:%02X\n", c.aRegister, c.xRegister, c.yRegister, c.statusRegister, c.stackPtr)
+
+	case mode == ABSOLUTE_INDIRECT:
 		fmt.Printf(pcDoubleInst, c.pc, opcode, dataSingle, dataDouble, getInst(opcode))
 		loc := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
@@ -206,14 +285,16 @@ func (c *Cpu) addrMode(mode string) uint16 {
 		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.yRegister)
 	case mode == INDIRECT_X:
-		base := c.cpuBus.ReadSingleByte(c.pc+1) + c.xRegister
+		base := uint16(c.cpuBus.ReadSingleByte(c.pc+1) + (c.xRegister))
 		low := uint16(c.cpuBus.ReadSingleByte(uint16(base)))
-		hi := uint16(c.cpuBus.ReadSingleByte(uint16(base) + 1))
+		temp := uint8(base + 1)
+		hi := uint16(c.cpuBus.ReadSingleByte(uint16(temp)))
 		dataLocation = (hi << 8) | low
 	case mode == INDIRECT_Y:
 		pos := uint16(c.cpuBus.ReadSingleByte(c.pc + 1))
 		low := c.cpuBus.ReadSingleByte(pos)
-		hi := c.cpuBus.ReadSingleByte(pos + 1)
+		temp := uint8(pos + 1)
+		hi := c.cpuBus.ReadSingleByte(uint16(temp))
 		loc := uint16(hi)<<8 | uint16(low)
 		dataLocation = loc + uint16(c.yRegister)
 	case mode == ZERO_PAGE:
@@ -234,13 +315,12 @@ func (c *Cpu) set() {
 	c.yRegister = 0
 	c.statusRegister = 0x24
 	c.stackPtr = STACK
-	c.cpuBus.WriteDoubleByte(pcStart, programLocation)
-	c.pc = c.cpuBus.ReadDoubleByte(pcStart)
+	c.pc = 0xc000
 }
-func (c *Cpu) LoadToMem(data []uint8) {
+func (c *Cpu) LoadToMem(rom *rom.Rom) {
 	c.cpuBus = bus{}
-	programLength = programLocation + uint16(len(data))
-	copy(c.cpuBus.mem[programLocation:programLength], data)
+	c.cpuBus.rom = rom
+	programLength = uint16(len(rom.ProgramRom))
 
 }
 func (c *Cpu) SEC() {
@@ -304,6 +384,14 @@ func (c *Cpu) alterZeroAndNeg(data uint8) {
 	}
 
 }
+func (c *Cpu) ISC(mode string) {
+	c.INC(mode)
+	c.SBC(mode)
+}
+func (c *Cpu) LAX(mode string) {
+	c.LDA(mode)
+	c.xRegister = c.aRegister
+}
 
 func (c *Cpu) LDX(mode string) {
 	loc := c.addrMode(mode)
@@ -320,21 +408,87 @@ func (c *Cpu) LDY(mode string) {
 
 	c.yRegister = data
 }
-func (c *Cpu) SBC(mode string) {
-	fmt.Println("sub sus")
-	os.Exit(0)
+func (c *Cpu) SBC(mode string, hidden ...*uint8) {
+
+	// fmt.Println("sub sus")
+	// os.Exit(0)
+	loc := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(loc)
+	if len(hidden) != 0 {
+		data = *hidden[0]
+	}
+
+	data = ^data
+
+	if hasBit(c.statusRegister, CARRY_FLAG) {
+		data++
+	}
+	t := (c.aRegister) + (data)
+	temp := uint8(t)
+
+	if (!hasBit(c.aRegister, 7) && !hasBit(data, 7)) && (hasBit(temp, 7)) {
+		c.SetOverflow()
+		if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
+			c.SEC()
+		} else {
+			c.CLC()
+		}
+	} else {
+		if (hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
+
+			c.SetOverflow()
+			if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
+				c.SEC()
+			} else {
+				c.CLC()
+			}
+
+		} else {
+
+			c.CLV()
+
+			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) || (hasBit(c.aRegister, 7) && !hasBit(data, 7)) {
+
+				if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
+					c.SEC()
+				} else {
+					if data != 0 {
+						c.CLC()
+					}
+				}
+
+			}
+		}
+
+	}
+	c.aRegister = temp
+	if c.aRegister == 0 {
+		c.SetZero()
+	} else {
+		c.ClearZero()
+	}
+	if hasBit(c.aRegister, 7) {
+		c.SetNegative()
+	} else {
+		c.ClearNegative()
+	}
 
 }
 
-func (c *Cpu) ADC(mode string) {
-	fmt.Println("add sus")
-	os.Exit(0)
+func (c *Cpu) ADC(mode string, hidden ...*uint8) {
+	// fmt.Println("add sus")
+	// os.Exit(0)
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
-	temp := c.aRegister + data
-	if hasBit(c.statusRegister, CARRY_FLAG) {
-		temp++
+	if len(hidden) != 0 {
+		data = *hidden[0]
 	}
+	t := (c.aRegister) + (data)
+	if hasBit(c.statusRegister, CARRY_FLAG) {
+		t++
+	}
+	c.CLC()
+	temp := uint8(t)
 
 	if (!hasBit(c.aRegister, 7) && !hasBit(data, 7)) && (hasBit(temp, 7)) {
 		c.SetOverflow()
@@ -356,26 +510,36 @@ func (c *Cpu) ADC(mode string) {
 	c.aRegister = temp
 	if c.aRegister == 0 {
 		c.SetZero()
+	} else {
+		c.ClearZero()
 	}
 	if hasBit(c.aRegister, 7) {
 		c.SetNegative()
+	} else {
+		c.ClearNegative()
 	}
 }
 
 func (c *Cpu) STA(mode string) {
-
 	loc := c.addrMode(mode)
-
 	c.cpuBus.WriteSingleByte(loc, c.aRegister)
 }
 func (c *Cpu) STX(mode string) {
 	loc := c.addrMode(mode)
+
 	c.cpuBus.WriteSingleByte(loc, c.xRegister)
 }
 func (c *Cpu) STY(mode string) {
 	loc := c.addrMode(mode)
+
 	c.cpuBus.WriteSingleByte(loc, c.yRegister)
 }
+func (c *Cpu) SAX(mode string) {
+	loc := c.addrMode(mode)
+	data := c.aRegister & c.xRegister
+	c.cpuBus.WriteSingleByte(loc, data)
+}
+
 func (c *Cpu) TAX() {
 	data := c.aRegister
 	c.alterZeroAndNeg(data)
@@ -410,25 +574,35 @@ func (c *Cpu) TSX() {
 	c.xRegister = data
 }
 
-func (c *Cpu) AND(mode string) {
+func (c *Cpu) AND(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
+	if len(hidden) != 0 {
+		data = *hidden[0]
+	}
 	c.aRegister = data & c.aRegister
 	c.alterZeroAndNeg(c.aRegister)
 
 }
 
-func (c *Cpu) ORA(mode string) {
+func (c *Cpu) ORA(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
+
 	data := c.cpuBus.ReadSingleByte(loc)
+	if len(hidden) != 0 {
+		data = *(hidden[0])
+	}
 	c.aRegister = data | c.aRegister
 	c.alterZeroAndNeg(c.aRegister)
 
 }
 
-func (c *Cpu) EOR(mode string) {
+func (c *Cpu) EOR(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
+	if len(hidden) != 0 {
+		data = *hidden[0]
+	}
 	c.aRegister = data ^ c.aRegister
 	c.alterZeroAndNeg(c.aRegister)
 
@@ -449,8 +623,6 @@ func (c *Cpu) DEX() {
 	c.xRegister--
 	c.alterZeroAndNeg(c.xRegister)
 
-}
-func (c *Cpu) NOP() {
 }
 
 func (c *Cpu) DEY() {
@@ -598,6 +770,11 @@ func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 	}
 
 }
+func (c *Cpu) SLO(mode string) {
+	//var data uint8=0
+	c.ASL(mode)
+	c.ORA(mode)
+}
 
 func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 	var data uint8
@@ -639,16 +816,17 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 7)
 	data = data << 1
-	if mode == ACCUMULATOR {
-		c.aRegister = data
-	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
-	}
 	if temp > 0 {
 		data = setBit(data, 0)
 	} else {
 		data = clearBit(data, 0)
 	}
+	if mode == ACCUMULATOR {
+		c.aRegister = data
+	} else {
+		c.cpuBus.WriteSingleByte(loc, data)
+	}
+
 	if templast > 0 {
 		c.SEC()
 	} else {
@@ -671,6 +849,51 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 	}
 
 }
+func (c *Cpu) SRE(mode string) {
+
+	c.LSR(mode)
+	c.EOR(mode)
+
+}
+func (c *Cpu) AXS(mode string) {
+	loc := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(loc)
+	c.xRegister = c.xRegister & c.aRegister
+	if data <= c.xRegister {
+		c.SEC()
+	}
+	c.xRegister = c.xRegister - data
+
+	c.alterZeroAndNeg(c.xRegister)
+}
+
+func (c *Cpu) ARR(mode string) {
+	loc := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(loc)
+	c.AND(mode, &data)
+	c.aRegister = data & c.aRegister
+	c.ROR(ACCUMULATOR)
+	temp := c.Acc()
+	if hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SEC()
+		c.CLV()
+	}
+	if !hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.CLV()
+	}
+	if hasBit(temp, 5) && !hasBit(temp, 6) {
+		c.CLC()
+		c.SetOverflow()
+	}
+	if !hasBit(temp, 5) && hasBit(temp, 6) {
+		c.SetOverflow()
+		c.SEC()
+	}
+
+	c.alterZeroAndNeg(temp)
+
+}
 
 func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 	var data uint8
@@ -684,16 +907,17 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 0)
 	data = data >> 1
-	if mode == ACCUMULATOR {
-		c.aRegister = data
-	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
-	}
 	if temp > 0 {
 		data = setBit(data, 7)
 	} else {
 		data = clearBit(data, 7)
 	}
+	if mode == ACCUMULATOR {
+		c.aRegister = data
+	} else {
+		c.cpuBus.WriteSingleByte(loc, data)
+	}
+
 	if templast > 0 {
 		c.SEC()
 	} else {
@@ -709,9 +933,6 @@ func (c *Cpu) ROR(mode string, hidden ...*uint8) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
-	}
-	if len(hidden) != 0 {
-		hidden[0] = &data
 	}
 
 }
@@ -809,11 +1030,103 @@ func (c *Cpu) BNE() {
 
 	}
 }
+func (c *Cpu) ANC(mode string) {
+
+	c.AND(mode)
+	if hasBit(c.aRegister, NEGATIVE_FLAG) {
+		c.SEC()
+	} else {
+		c.CLC()
+	}
+}
+
+func (c *Cpu) ALR(mode string) {
+
+	c.AND(mode)
+	c.LSR(ACCUMULATOR)
+}
+
+func (c *Cpu) RRA(mode string) {
+
+	c.ROR(mode)
+	c.ADC(mode)
+}
+
+func (c *Cpu) DCP(mode string) {
+	location := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(location)
+	data--
+	c.cpuBus.WriteSingleByte(location, data)
+	if data <= c.aRegister {
+		c.SEC()
+	}
+	data = c.aRegister - data
+	c.alterZeroAndNeg(data)
+}
+
+func (c *Cpu) XAA(mode string) {
+	location := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(location)
+	c.aRegister = c.xRegister
+	c.alterZeroAndNeg(c.aRegister)
+	c.AND(mode, &data)
+
+}
+
+func (c *Cpu) LAS(mode string) {
+	location := c.addrMode(mode)
+	data := c.cpuBus.ReadSingleByte(location)
+	c.stackPtr = c.stackPtr & data
+	c.aRegister = c.stackPtr & data
+	c.xRegister = c.stackPtr & data
+	c.alterZeroAndNeg(c.aRegister)
+
+}
+
+func (c *Cpu) TAS(mode string) {
+	data := c.aRegister & c.xRegister
+	c.stackPtr = data
+	loc := c.addrMode(mode)
+	data = (uint8(loc>>8) + 1) & data
+	c.cpuBus.WriteSingleByte(loc, data)
+
+}
+func (c *Cpu) AHX(mode string) {
+	data := c.aRegister & c.xRegister
+	loc := c.addrMode(mode)
+	data = (uint8(loc>>8) + 1) & data
+	c.cpuBus.WriteSingleByte(loc, data)
+}
+func (c *Cpu) SHX(mode string) {
+	data := c.xRegister
+	loc := c.addrMode(mode)
+	data = (uint8(loc>>8) + 1) & data
+	c.cpuBus.WriteSingleByte(loc, data)
+}
+func (c *Cpu) SHY(mode string) {
+	data := c.yRegister
+	loc := c.addrMode(mode)
+	data = (uint8(loc>>8) + 1) & data
+	c.cpuBus.WriteSingleByte(loc, data)
+}
+
+func (c *Cpu) RLA(mode string) {
+
+	c.ROL(mode)
+	c.AND(mode)
+
+}
+
 func (c *Cpu) JSR() {
 	//we need to make sure we increment within the same cycle
 	addr := c.addrMode(ABSOLUTE)
-	c.PushDouble(c.pc + 3)
+	c.PushDouble(c.pc + 2)
 	c.pc = addr
+}
+func (c *Cpu) RTS() {
+	val := c.PopDouble()
+	c.pc = val + 1
+
 }
 func (c *Cpu) PHA() {
 	acc := c.Acc()
@@ -821,6 +1134,8 @@ func (c *Cpu) PHA() {
 }
 func (c *Cpu) PHP() {
 	reg := c.statusRegister
+	reg = setBit(reg, BREAK_FLAG)
+	reg = setBit(reg, 5)
 	c.Push(reg)
 }
 func (c *Cpu) PLA() {
@@ -831,9 +1146,8 @@ func (c *Cpu) PLA() {
 func (c *Cpu) RTI() {
 	c.statusRegister = c.Pop()
 	c.pc = c.PopDouble()
-	if !hasBit(c.statusRegister, 2) {
-		c.CLI()
-	}
+	c.ClearBreak()
+	c.statusRegister = setBit(c.statusRegister, 5)
 
 }
 func (c *Cpu) BRK() {
@@ -842,51 +1156,16 @@ func (c *Cpu) BRK() {
 	c.SEI()
 }
 
-func (c *Cpu) RTS() {
-	val := c.PopDouble()
-	c.pc = val
-
-}
-
 func (c *Cpu) PLP() {
 	reg := c.Pop()
-
-	if hasBit(reg, NEGATIVE_FLAG) {
-		c.SetNegative()
-	} else {
-		c.ClearNegative()
-	}
-
-	if hasBit(reg, OVERFLOW_FLAG) {
-		c.SetOverflow()
-	} else {
-		c.statusRegister = clearBit(c.statusRegister, OVERFLOW_FLAG)
-	}
-	if hasBit(reg, DECIMAL_FLAG) {
-		c.SED()
-	} else {
-		c.CLD()
-	}
-	if hasBit(reg, INTERRUPT_FLAG) {
-		c.SEI()
-	} else {
-		c.CLI()
-	}
-	if hasBit(reg, ZERO_FLAG) {
-		c.SetZero()
-	} else {
-		c.ClearZero()
-	}
-	if hasBit(reg, CARRY_FLAG) {
-		c.CLC()
-	} else {
-		c.SEC()
-	}
-
+	c.statusRegister = reg
+	c.ClearBreak()
+	c.statusRegister = setBit(c.statusRegister, 5)
 }
 
 func (c *Cpu) LDA(mode string) {
 	loc := c.addrMode(mode)
+
 	data := c.cpuBus.ReadSingleByte(loc)
 	if data == 0 {
 		c.SetZero()
@@ -900,10 +1179,18 @@ func (c *Cpu) LDA(mode string) {
 	}
 
 	c.aRegister = data
+
+}
+
+func (c *Cpu) NOP(mode string) {
+	if mode == IMPLIED {
+		return
+	}
+
 }
 
 func (c *Cpu) Push(val uint8) {
-	loc := uint16(c.stackPtr)
+	loc := 0x0100 + uint16(c.stackPtr)
 	c.cpuBus.WriteSingleByte(loc, val)
 	c.stackPtr--
 }
@@ -922,32 +1209,46 @@ func (c *Cpu) PopDouble() uint16 {
 func (c *Cpu) Pop() uint8 {
 	c.stackPtr++
 	//stack grows down
-	loc := uint16(c.stackPtr)
+	loc := 0x0100 + uint16(c.stackPtr)
 	temp := c.cpuBus.ReadSingleByte(loc)
-	c.cpuBus.WriteSingleByte(loc, 0)
 	return temp
 }
 
 type bus struct {
 	mem [0xFFFF]uint8
+	rom *rom.Rom
 }
 
 //WriteSingleByte writes single byte to mem
 func (b *bus) WriteSingleByte(addr uint16, data uint8) {
-	//mirror(addr)
+
+	addr = mirror(addr)
 	b.mem[addr] = data
 
 }
 
 //ReadSingleByte writes single byte to mem
 func (b *bus) ReadSingleByte(addr uint16) uint8 {
-	//mirror(addr)
-	data := b.mem[addr]
-	return data
+	if addr < 0x8000 || addr > 0xffff {
+		addr = mirror(addr)
+		data := b.mem[addr]
+		return data
+	} else {
+
+		addr = addr - 0x8000
+		if len(b.rom.ProgramRom) <= 0x4000 && addr >= 0x4000 {
+			addr = addr % 0x4000
+		}
+		data := b.rom.ProgramRom[addr]
+		return data
+	}
+
 }
 
 func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
-	//mirror(addr)
+
+	addr = mirror(addr)
+
 	low := uint8(data & 0x00FF)
 	b.mem[addr] = low
 	hi := uint8((data) >> 8)
@@ -957,18 +1258,35 @@ func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
 
 //mirror function to map mem locations to similar ranges (to be utilized if i decided to build the nes emulator)
 func mirror(addr uint16) uint16 {
-	if addr >= 0x000 && addr <= 0x2000 {
+	if addr >= 0x0000 && addr <= 0x1FFF {
 		addr = clearBit16(addr, 11)
 		addr = clearBit16(addr, 12)
+		addr = clearBit16(addr, 13)
+		addr = clearBit16(addr, 14)
+		addr = clearBit16(addr, 15)
+
 	}
+
 	return addr
 }
 func (b *bus) ReadDoubleByte(addr uint16) uint16 {
-	//mirror(addr)
-	var low uint16 = uint16(b.mem[addr])
-	var hi uint16 = uint16(b.mem[addr+1])
-	res := (hi << 8) | low
-	return res
+	if addr < 0x8000 || addr > 0xffff {
+		addr = mirror(addr)
+		var low uint16 = uint16(b.mem[addr])
+		var hi uint16 = uint16(b.mem[addr+1])
+		res := (hi << 8) | low
+		return res
+	} else {
+		addr = addr - 0x8000
+		if len(b.rom.ProgramRom) <= 0x4000 && addr >= 0x4000 {
+			addr = addr % 0x4000
+		}
+		var low uint16 = uint16(b.rom.ProgramRom[addr])
+		var hi uint16 = uint16(b.rom.ProgramRom[addr+1])
+		res := (hi << 8) | low
+		return res
+	}
+
 }
 
 func getAddrMode(opcode uint8) string {
@@ -985,10 +1303,12 @@ func getNumber(opcode uint8) int {
 
 func (c *Cpu) Run() {
 	c.set()
-	for c.pc < programLength {
+	for {
 
 		temp := c.pc
+
 		location := c.cpuBus.ReadSingleByte(c.pc)
+
 		mode := getAddrMode(location)
 		c.TraceExecution(mode)
 		switch location {
@@ -1044,8 +1364,9 @@ func (c *Cpu) Run() {
 
 		case 0xA5, 0xA9, 0xB5, 0xAD, 0xBD, 0xB9, 0xA1, 0xB1:
 			c.LDA(mode)
-
-		case 0xf5, 0xE9, 0xE5, 0xED, 0xFD, 0xF9, 0xE1, 0xF1:
+		case 0x4b:
+			c.ALR(mode)
+		case 0xf5, 0xE9, 0xE5, 0xED, 0xFD, 0xF9, 0xE1, 0xF1, 0xEB:
 			c.SBC(mode)
 		case 0x06, 0x0A, 0x16, 0x0E, 0x1E:
 			c.ASL(mode)
@@ -1066,6 +1387,14 @@ func (c *Cpu) Run() {
 
 		case 0xc6, 0xD6, 0xCE, 0xDE:
 			c.DEC(mode)
+		case 0xA7, 0xB7, 0xAF, 0xBf, 0xA3, 0xB3, 0xab:
+			c.LAX(mode)
+		case 0x67, 0x77, 0x6F, 0x7f, 0x7B, 0x63, 0x73:
+			c.RRA(mode)
+		case 0xE7, 0xF7, 0xEF, 0xFf, 0xFB, 0xE3, 0xF3:
+			c.ISC(mode)
+		case 0x0b, 0x2b:
+			c.ANC(mode)
 
 		case 0x08:
 			c.PHP()
@@ -1085,6 +1414,11 @@ func (c *Cpu) Run() {
 			c.SEI()
 		case 0x88:
 			c.DEY()
+
+		case 0x87, 0x97, 0x8f, 0x83:
+			c.SAX(mode)
+		case 0x8B:
+			c.XAA(mode)
 		case 0x98:
 			c.TYA()
 		case 0xA8:
@@ -1098,12 +1432,23 @@ func (c *Cpu) Run() {
 			//lmao no decimal mode
 		case 0xE8:
 			c.INX()
+		case 0xc7, 0xd7, 0xcf, 0xdf, 0xdb, 0xc3, 0xd3:
+			c.DCP(mode)
 		case 0xF8:
 			c.SED()
+		case 0x27, 0x37, 0x3f, 0x2f, 0x3b, 0x33, 0x23:
+			c.RLA(mode)
 			//lmao no decimal mode
 		case 0x49, 0x45, 0x55, 0x4D, 0x5D, 0x59, 0x41, 0x51:
 			c.EOR(mode)
-
+		case 0x07, 0x17, 0x0f, 0x1f, 0x1b, 0x03, 0x13:
+			c.SLO(mode)
+		case 0x47, 0x57, 0x4f, 0x5f, 0x5b, 0x43, 0x53:
+			c.SRE(mode)
+		case 0xCB:
+			c.AXS(mode)
+		case 0x6b:
+			c.ARR(mode)
 		case 0x99, 0x85, 0x95, 0x8D, 0x9D, 0x81, 0x91:
 			c.STA(mode)
 
@@ -1120,8 +1465,8 @@ func (c *Cpu) Run() {
 			c.TSX()
 		case 0xca:
 			c.DEX()
-		case 0xea:
-			c.NOP()
+		case 0xea, 0x1A, 0x3A, 0x5A, 0x7A, 0xDA, 0xFA, 0x80, 0x82, 0x89, 0xC2, 0xE2, 0x04, 0x44, 0x64, 0x14, 0x34, 0x54, 0x74, 0xD4, 0xF4, 0x0C, 0x1C, 0x3C, 0x5C, 0x7C, 0xDC, 0xFC:
+			c.NOP(mode)
 		case 0x2c:
 			c.BIT(mode)
 		case 0x4c, 0x6C:
@@ -1134,6 +1479,16 @@ func (c *Cpu) Run() {
 
 		case 0xee, 0xE6, 0xF6, 0xFE:
 			c.INC(mode)
+		case 0xbb:
+			c.LAS(mode)
+		case 0x9b:
+			c.TAS(mode)
+		case 0x9f, 0x93:
+			c.AHX(mode)
+		case 0x9E:
+			c.SHX(mode)
+		case 0x9c:
+			c.SHY(mode)
 
 		}
 

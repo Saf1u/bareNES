@@ -37,7 +37,7 @@ func TestWriteDoubleyte(t *testing.T) {
 	assert.Equal(t, hi, cpu.cpuBus.mem[1])
 }
 
-func TestAddrMode(t *testing.T) {
+func TestAddrModes(t *testing.T) {
 	t.Run("test relative", func(t *testing.T) {
 		val := uint8(0x11)
 		cpu := &Cpu{}
@@ -120,4 +120,250 @@ func TestAddrMode(t *testing.T) {
 		location := cpu.addrMode(INDIRECT_Y)
 		assert.Equal(t, location, uint16(0x8131)+uint16(0x11))
 	})
+
+	t.Run("test zeroPage", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.pc = 0
+		cpu.cpuBus.mem[1] = 0x11
+		location := cpu.addrMode(ZERO_PAGE)
+		assert.Equal(t, location, uint16(0x11))
+	})
+	t.Run("test indirect", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.pc = 0
+		cpu.cpuBus.mem[1] = 0x11
+		cpu.cpuBus.mem[2] = 0x32
+		location := cpu.addrMode(INDIRECT)
+		assert.Equal(t, location, uint16(0x3211))
+	})
+
+}
+
+func TestLDX(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.cpuBus.mem[1] = tt.data
+			cpu.LDX(IMMEDIATE)
+			assert.Equal(t, cpu.xRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+func TestLDA(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.cpuBus.mem[1] = tt.data
+			cpu.LDA(IMMEDIATE)
+			assert.Equal(t, cpu.aRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestLDY(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.cpuBus.mem[1] = tt.data
+			cpu.LDY(IMMEDIATE)
+			assert.Equal(t, cpu.yRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestStores(t *testing.T) {
+	t.Run("sta", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.pc = 0
+		cpu.aRegister = 0x11
+		cpu.cpuBus.mem[1] = 0x05
+		cpu.STA(ZERO_PAGE)
+		assert.Equal(t, cpu.cpuBus.mem[0x05], uint8(0x11))
+	})
+	t.Run("stx", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.pc = 0
+		cpu.xRegister = 0x11
+		cpu.cpuBus.mem[1] = 0x05
+		cpu.STX(ZERO_PAGE)
+		assert.Equal(t, cpu.cpuBus.mem[0x05], uint8(0x11))
+	})
+	t.Run("sty", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.pc = 0
+		cpu.yRegister = 0x11
+		cpu.cpuBus.mem[1] = 0x05
+		cpu.STY(ZERO_PAGE)
+		assert.Equal(t, cpu.cpuBus.mem[0x05], uint8(0x11))
+	})
+
+}
+
+func TestTAX(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.aRegister = tt.data
+			cpu.TAX()
+			assert.Equal(t, cpu.xRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestTAY(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.aRegister = tt.data
+			cpu.TAY()
+			assert.Equal(t, cpu.yRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestTXA(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.xRegister = tt.data
+			cpu.TXA()
+			assert.Equal(t, cpu.aRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestTYA(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.yRegister = tt.data
+			cpu.TYA()
+			assert.Equal(t, cpu.aRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestTSX(t *testing.T) {
+	var cases = []struct {
+		description string
+		isZero      bool
+		bitSevenOne bool
+		data        uint8
+	}{
+		{"zero", true, false, 0x0},
+		{"7th bit negative", false, true, 0b11111111},
+		{"7th bit zero", false, false, 0b01111111},
+	}
+	for _, tt := range cases {
+		t.Run(tt.description, func(t *testing.T) {
+			cpu := &Cpu{}
+			cpu.pc = 0
+			cpu.stackPtr = tt.data
+			cpu.TSX()
+			assert.Equal(t, cpu.xRegister, tt.data)
+			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+		})
+	}
+}
+
+func TestTXS(t *testing.T) {
+	t.Run("txs", func(t *testing.T) {
+		cpu := &Cpu{}
+		cpu.xRegister = 0x11
+		cpu.TXS()
+		assert.Equal(t, cpu.stackPtr, uint8(0x11))
+	})
+
 }

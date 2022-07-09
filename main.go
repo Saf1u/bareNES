@@ -1,28 +1,65 @@
 package main
 
 import (
+	"bufio"
 	"emulator/cpu"
+	"emulator/rom"
 	"fmt"
-	"io/ioutil"
+	"log"
+	"os"
 )
 
 func main() {
 	cpu := &cpu.Cpu{}
-
-	content, err := ioutil.ReadFile("nest.nes")
+	rom, err := rom.NewRom("nest.nes")
 	if err != nil {
 		fmt.Println(err)
 	}
-	//16
-	//1662
-	max := int(content[4]) * 16384
-	rom := []uint8{}
-	i := 16
-
-	for ; i < max; i++ {
-
-		rom = append(rom, uint8(content[i]))
-	}
 	cpu.LoadToMem(rom)
 	cpu.Run()
+
+	//sys_test()
+
+}
+
+func sys_test() {
+	myLog, err := os.Open("mine.log")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	rd := bufio.NewReader(myLog)
+	myLogConent, err := rd.ReadString('\n')
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	sampleLog, err := os.Open("nestest_no_cycle.log")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	rdd := bufio.NewReader(sampleLog)
+	sampleLogContent, err := rdd.ReadString('\n')
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	for {
+		if myLogConent != sampleLogContent {
+			fmt.Println(myLogConent)
+			fmt.Println(sampleLogContent)
+			os.Exit(0)
+		}
+		myLogConent, err = rd.ReadString('\n')
+		if err != nil {
+			break
+		}
+		sampleLogContent, err = rdd.ReadString('\n')
+		if err != nil {
+			break
+		}
+	}
+
 }
