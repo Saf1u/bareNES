@@ -252,12 +252,9 @@ func (c *Cpu) LDY(mode string) {
 
 	c.yRegister = data
 }
-func (c *Cpu) SBC(mode string, hidden ...*uint8) {
+func (c *Cpu) SBC(mode string) {
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
-	if len(hidden) != 0 {
-		data = *hidden[0]
-	}
 
 	data = ^data
 
@@ -316,12 +313,10 @@ func (c *Cpu) SBC(mode string, hidden ...*uint8) {
 
 }
 
-func (c *Cpu) ADC(mode string, hidden ...*uint8) {
+func (c *Cpu) ADC(mode string) {
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
-	if len(hidden) != 0 {
-		data = *hidden[0]
-	}
+
 	t := (c.aRegister) + (data)
 	if hasBit(c.statusRegister, CARRY_FLAG) {
 		t++
@@ -470,15 +465,12 @@ func (c *Cpu) DEY() {
 
 }
 
-func (c *Cpu) INC(mode string, hidden ...*uint8) {
+func (c *Cpu) INC(mode string) {
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
 	data++
 	c.cpuBus.WriteSingleByte(loc, data)
 	c.alterZeroAndNeg(data)
-	if len(hidden) != 0 {
-		hidden[0] = &data
-	}
 
 }
 
@@ -578,7 +570,7 @@ func (c *Cpu) BIT(mode string) {
 
 }
 
-func (c *Cpu) LSR(mode string, hidden ...*uint8) {
+func (c *Cpu) LSR(mode string) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
@@ -604,9 +596,6 @@ func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 	} else {
 		c.ClearZero()
 	}
-	if len(hidden) != 0 {
-		hidden[0] = &data
-	}
 
 }
 func (c *Cpu) SLO(mode string) {
@@ -615,7 +604,7 @@ func (c *Cpu) SLO(mode string) {
 	c.ORA(mode)
 }
 
-func (c *Cpu) ASL(mode string, hidden ...*uint8) {
+func (c *Cpu) ASL(mode string) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
@@ -636,13 +625,10 @@ func (c *Cpu) ASL(mode string, hidden ...*uint8) {
 		c.cpuBus.WriteSingleByte(loc, data)
 	}
 	c.alterZeroAndNeg(data)
-	if len(hidden) != 0 {
-		hidden[0] = &data
-	}
 
 }
 
-func (c *Cpu) ROL(mode string, hidden ...*uint8) {
+func (c *Cpu) ROL(mode string) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
@@ -682,9 +668,6 @@ func (c *Cpu) ROL(mode string, hidden ...*uint8) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
-	}
-	if len(hidden) != 0 {
-		hidden[0] = &data
 	}
 
 }
@@ -734,7 +717,7 @@ func (c *Cpu) ARR(mode string) {
 
 }
 
-func (c *Cpu) ROR(mode string, hidden ...*uint8) {
+func (c *Cpu) ROR(mode string) {
 	var data uint8
 	var loc uint16
 	if mode == ACCUMULATOR {
