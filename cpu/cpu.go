@@ -2,13 +2,43 @@ package cpu
 
 import (
 	"emulator/rom"
-	"strconv"
 )
 
 //should be 0x0600??
 const programLocation = 0xc000
-
 const pcStart = 0xFFFC
+const STACK uint8 = 0xfd
+const (
+	ACCUMULATOR              = "Accumulator"
+	RELATIVE                 = "relative"
+	ABSOLUTE_INDIRECT        = "absindirect"
+	IMPLIED                  = "implied"
+	IMMEDIATE                = "imm"
+	ZERO_PAGE_X              = "zpx"
+	ABSOLUTE                 = "abs"
+	ZERO_PAGE_Y              = "zpy"
+	ZERO_PAGE                = "zpg"
+	ABSOLUTE_X               = "absx"
+	ABSOLUTE_Y               = "absy"
+	INDIRECT_X               = "indx"
+	INDIRECT_Y               = "indy"
+	CARRY_FLAG               = 0
+	ZERO_FLAG                = 1
+	INTERRUPT_FLAG           = 2
+	DECIMAL_FLAG             = 3
+	BREAK_FLAG               = 4
+	OVERFLOW_FLAG            = 6
+	NEGATIVE_FLAG            = 7
+	INDIRECT                 = "ind"
+	CPU_RAM_START     uint16 = 0x0000
+	CPU_RAM_END       uint16 = 0x1fff
+	PPU_REGISTERS     uint16 = 0x2000
+	PPU_REGISTERS_END uint16 = 0x3fff
+	PROG_ROM_START    uint16 = 0x8000
+	PROG_ROM_END      uint16 = 0xffff
+)
+
+const STACK_PAGE uint16 = 0x0100
 
 //Cpu composes of a 6502 register set and addressable memory
 type Cpu struct {
@@ -20,36 +50,54 @@ type Cpu struct {
 	statusRegister uint8
 	cpuBus         bus
 }
+type bus struct {
+	cpuRam [2048]uint8
+	rom    *rom.Rom
+}
 
-const STACK uint8 = 0xfd
+func (b *bus) WriteSingleByte(addr uint16, data uint8) {
 
-var programLength uint16
+	addr = mirror(addr)
+	b.cpuRam[addr] = data
 
-const (
-	ACCUMULATOR       = "Accumulator"
-	RELATIVE          = "relative"
-	ABSOLUTE_INDIRECT = "absindirect"
-	IMPLIED           = "implied"
-	IMMEDIATE         = "imm"
-	ZERO_PAGE_X       = "zpx"
-	ABSOLUTE          = "abs"
-	ZERO_PAGE_Y       = "zpy"
-	ZERO_PAGE         = "zpg"
-	ABSOLUTE_X        = "absx"
-	ABSOLUTE_Y        = "absy"
-	INDIRECT_X        = "indx"
-	INDIRECT_Y        = "indy"
-	CARRY_FLAG        = 0
-	ZERO_FLAG         = 1
-	INTERRUPT_FLAG    = 2
-	DECIMAL_FLAG      = 3
-	BREAK_FLAG        = 4
-	OVERFLOW_FLAG     = 6
-	NEGATIVE_FLAG     = 7
-	INDIRECT          = "ind"
-)
+	switch {
+	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
+		addr = mirror(addr)
+		b.cpuRam[addr] = data
+	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
 
-const STACK_PAGE uint16 = 0x0100
+	}
+
+}
+
+func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
+
+	low := uint8(data & 0x00FF)
+	hi := uint8((data) >> 8)
+	b.WriteSingleByte(addr, low)
+	b.WriteSingleByte(addr+1, hi)
+}
+
+func (b *bus) ReadSingleByte(addr uint16) uint8 {
+	var data uint8 = 0
+	switch {
+	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
+		addr = mirror(addr)
+		data = b.cpuRam[addr]
+	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
+		data = b.rom.ReadRom(addr)
+	}
+	return data
+
+}
+func (b *bus) ReadDoubleByte(addr uint16) uint16 {
+
+	var low uint16 = uint16(b.ReadSingleByte(addr))
+	var hi uint16 = uint16(b.ReadSingleByte(addr + 1))
+	res := (hi << 8) | low
+	return res
+
+}
 
 func (c *Cpu) Acc() uint8 {
 	return c.aRegister
@@ -57,11 +105,6 @@ func (c *Cpu) Acc() uint8 {
 func (c *Cpu) Stat() uint8 {
 	return c.statusRegister
 }
-
-func getInst(opcode uint8) string {
-	return instructionInfo[opcode][0]
-}
-
 func (c *Cpu) addrMode(mode string) uint16 {
 	var dataLocation uint16
 	switch {
@@ -123,8 +166,6 @@ func (c *Cpu) set() {
 func (c *Cpu) LoadToMem(rom *rom.Rom) {
 	c.cpuBus = bus{}
 	c.cpuBus.rom = rom
-	programLength = uint16(len(rom.ProgramRom))
-
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
@@ -212,9 +253,6 @@ func (c *Cpu) LDY(mode string) {
 	c.yRegister = data
 }
 func (c *Cpu) SBC(mode string, hidden ...*uint8) {
-
-	// fmt.Println("sub sus")
-	// os.Exit(0)
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
 	if len(hidden) != 0 {
@@ -279,8 +317,6 @@ func (c *Cpu) SBC(mode string, hidden ...*uint8) {
 }
 
 func (c *Cpu) ADC(mode string, hidden ...*uint8) {
-	// fmt.Println("add sus")
-	// os.Exit(0)
 	loc := c.addrMode(mode)
 	data := c.cpuBus.ReadSingleByte(loc)
 	if len(hidden) != 0 {
@@ -557,7 +593,7 @@ func (c *Cpu) LSR(mode string, hidden ...*uint8) {
 		c.CLC()
 	}
 	data = data >> 1
-	if mode == "Accumulator" {
+	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
 		c.cpuBus.WriteSingleByte(loc, data)
@@ -1015,76 +1051,6 @@ func (c *Cpu) Pop() uint8 {
 	loc := 0x0100 + uint16(c.stackPtr)
 	temp := c.cpuBus.ReadSingleByte(loc)
 	return temp
-}
-
-type bus struct {
-	cpuRam [2048]uint8
-	rom    *rom.Rom
-}
-
-func (b *bus) WriteSingleByte(addr uint16, data uint8) {
-
-	addr = mirror(addr)
-	b.cpuRam[addr] = data
-
-	switch {
-	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
-		addr = mirror(addr)
-		b.cpuRam[addr] = data
-	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
-
-	}
-
-}
-
-func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
-
-	low := uint8(data & 0x00FF)
-	hi := uint8((data) >> 8)
-	b.WriteSingleByte(addr, low)
-	b.WriteSingleByte(addr+1, hi)
-}
-
-const (
-	CPU_RAM_START     uint16 = 0x0000
-	CPU_RAM_END       uint16 = 0x1fff
-	PPU_REGISTERS     uint16 = 0x2000
-	PPU_REGISTERS_END uint16 = 0x3fff
-	PROG_ROM_START    uint16 = 0x8000
-	PROG_ROM_END      uint16 = 0xffff
-)
-
-func (b *bus) ReadSingleByte(addr uint16) uint8 {
-	var data uint8 = 0
-	switch {
-	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
-		addr = mirror(addr)
-		data = b.cpuRam[addr]
-	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
-		data = b.rom.ReadRom(addr)
-	}
-	return data
-
-}
-func (b *bus) ReadDoubleByte(addr uint16) uint16 {
-
-	var low uint16 = uint16(b.ReadSingleByte(addr))
-	var hi uint16 = uint16(b.ReadSingleByte(addr + 1))
-	res := (hi << 8) | low
-	return res
-
-}
-
-func getAddrMode(opcode uint8) string {
-	return instructionInfo[opcode][2]
-}
-func getNumber(opcode uint8) int {
-	number := instructionInfo[opcode][1]
-	num, err := strconv.Atoi(number)
-	if err != nil {
-		return -1
-	}
-	return num
 }
 
 func (c *Cpu) Run() {

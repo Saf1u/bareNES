@@ -1,5 +1,7 @@
 package cpu
 
+import "strconv"
+
 func setBit(num uint8, pos int) uint8 {
 
 	num |= (uint8(1) << pos)
@@ -37,4 +39,20 @@ func mirror(addr uint16) uint16 {
 	addr = clearBit16(addr, 14)
 	addr = clearBit16(addr, 15)
 	return addr
+}
+
+func getAddrMode(opcode uint8) string {
+	return instructionInfo[opcode][2]
+}
+func getNumber(opcode uint8) int {
+	number := instructionInfo[opcode][1]
+	num, err := strconv.Atoi(number)
+	if err != nil {
+		return -1
+	}
+	return num
+}
+
+func getInst(opcode uint8) string {
+	return instructionInfo[opcode][0]
 }
