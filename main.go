@@ -2,23 +2,21 @@ package main
 
 import (
 	"bufio"
-	"emulator/cpu"
-	"emulator/rom"
 	"fmt"
 	"log"
 	"os"
 )
 
 func main() {
-	cpu := &cpu.Cpu{}
-	rom, err := rom.NewRom("nest.nes")
-	if err != nil {
-		fmt.Println(err)
-	}
-	cpu.LoadToMem(rom)
-	cpu.Run()
+	// cpu := &cpu.Cpu{}
+	// rom, err := rom.NewRom("nest.nes")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// cpu.LoadToMem(rom)
+	// cpu.Run()
 
-	//sys_test()
+	sys_test()
 
 }
 

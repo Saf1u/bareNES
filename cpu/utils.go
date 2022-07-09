@@ -30,11 +30,11 @@ func getBit(n uint8, pos int) uint8 {
 	return 0
 }
 
-// func mirror(addr uint16) uint16 {
-// 	addr = clearBit16(addr, 11)
-// 	addr = clearBit16(addr, 12)
-// 	addr = clearBit16(addr, 13)
-// 	addr = clearBit16(addr, 14)
-// 	addr = clearBit16(addr, 15)
-// 	return addr
-// }
+func mirror(addr uint16) uint16 {
+	addr = clearBit16(addr, 11)
+	addr = clearBit16(addr, 12)
+	addr = clearBit16(addr, 13)
+	addr = clearBit16(addr, 14)
+	addr = clearBit16(addr, 15)
+	return addr
+}

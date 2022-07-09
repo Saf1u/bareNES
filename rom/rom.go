@@ -2,9 +2,7 @@ package rom
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"os"
 )
 
 const (
@@ -59,7 +57,7 @@ func NewRom(file string) (*Rom, error) {
 	maxProg := uint(content[4]) * progRom
 	maxChar := uint(content[5]) * charRom
 	i := uint(16)
-	if uint(content[6])&0b100 == 0 {
+	if (content[6])&0b100 == 0 {
 		i = uint(16 + 512)
 	}
 	i = uint(16)
@@ -82,8 +80,6 @@ func (r *Rom) ReadRom(addr uint16) uint8 {
 	if len(r.ProgramRom) <= 0x4000 && addr >= 0x4000 {
 		addr = addr % 0x4000
 	}
-	fmt.Printf("%x", r.ProgramRom[addr])
-	os.Exit(0)
 	data := r.ProgramRom[addr]
 	return data
 
