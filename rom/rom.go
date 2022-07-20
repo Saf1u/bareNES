@@ -1,14 +1,9 @@
 package rom
 
 import (
+	"emulator/common"
 	"errors"
 	"io/ioutil"
-)
-
-const (
-	VERTICAL = iota
-	HORIZONTAL
-	FOUR_SCREEN
 )
 
 var (
@@ -46,12 +41,12 @@ func NewRom(file string) (*Rom, error) {
 		return nil, errors.New("not 1.0")
 	}
 	if ctrlByteOne&0b010000000 == 0 {
-		rom.MirorType = FOUR_SCREEN
+		rom.MirorType = common.FOUR_SCREEN
 	} else {
 		if ctrlByteOne&0b1 == 0 {
-			rom.MirorType = HORIZONTAL
+			rom.MirorType = common.HORIZONTAL
 		} else {
-			rom.MirorType = VERTICAL
+			rom.MirorType = common.VERTICAL
 		}
 	}
 	maxProg := uint(content[4]) * progRom

@@ -37,6 +37,6 @@ func TestClearBit16(t *testing.T) {
 func TestGetBit(t *testing.T) {
 	var num uint8 = 0b10000001
 	res := getBit(num, 0)
-	var expected uint8 =0b1
+	var expected uint8 = 0b1
 	assert.Equal(t, res, expected)
 }

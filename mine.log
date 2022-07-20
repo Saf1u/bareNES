@@ -8990,5 +8990,4 @@ C69F  8D 07 40  STA $4007 = 00                  A:00 X:FF Y:15 P:27 SP:FB
 C6A2  60        RTS                             A:00 X:FF Y:15 P:27 SP:FB
 C66E  60        RTS                             A:00 X:FF Y:15 P:27 SP:FD
 0001  FF 00 00 *ISB $0000,X @ 00FF = 46         A:00 X:FF Y:15 P:27 SP:FF
-0004  3F 9A FF *RLA $FF9A,X @ 0099 = 00         A:B9 X:FF Y:15 P:A4 SP:FF
-0007  00        BRK                             A:00 X:FF Y:15 P:26 SP:FF
+0004  00        BRK                             A:B9 X:FF Y:15 P:A4 SP:FF
