@@ -61,30 +61,41 @@ type Cpu struct {
 	cpuBus         bus
 }
 type bus struct {
-	cpuRam [2048]uint8
-	rom    *rom.Rom
-	ppu    *ppu.Ppu
+	cpuRam   [2048]uint8
+	rom      *rom.Rom
+	ppu      *ppu.Ppu
+	cpuTicks int
 }
 
+func (b *bus) tick(amount int) {
+	b.cpuTicks += amount
+	b.ppu.Tick(3 * amount)
+}
 func (b *bus) WriteSingleByte(addr uint16, data uint8) {
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
 		addr = mirror(addr)
 		b.cpuRam[addr] = data
-	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
+	case addr == PPU_DATA_REGISTER:
+		b.ppu.WriteData(data)
+	case addr == PPU_ADDRESS_REGISTER:
+		b.ppu.AddrRegister.Update(data)
+	case addr == PPU_MASK_REGISTER:
+		b.ppu.Mask.Update(data)
+	case addr == PPU_OAM_ADDRESS:
+		b.ppu.OamAddr.WriteAddressOam(data)
+	case addr == PPU_SCROLL_REGISTER:
+		b.ppu.Scroll.Update(data)
+	case addr == PPU_OAM_DATA:
+		b.ppu.WriteDataOam(data)
+	case addr == PPU_CONTROL_REGISTER:
+		b.ppu.WriteToCtrl(data)
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
-
+		b.WriteSingleByte(addr, data)
 	}
 
 }
-
-// case addr == 0x2006:
-// 	b.ppu.AddrRegister.Update(data)
-// case addr == 0x2000:
-// 	b.ppu.ControlRegister.Update(data)
-// case addr == 0x2700:
-// 	b.ppu.WriteData(data)
 
 func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
 
@@ -102,10 +113,15 @@ func (b *bus) ReadSingleByte(addr uint16) uint8 {
 		data = b.cpuRam[addr]
 	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
 		data = b.rom.ReadRom(addr)
+	case addr == PPU_DATA_REGISTER:
+		data = b.ppu.ReadData()
+	case addr == PPU_STATUS_REGISTER:
+		data = b.ppu.ReadStatus()
+	case addr == PPU_OAM_DATA:
+		data = b.ppu.ReadDataOamRegister()
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
-		//b.ppu.Read()
-		//add panic for reading from write only ppu addresses
+		b.ReadSingleByte(addr)
 
 	}
 	return data
@@ -185,8 +201,11 @@ func (c *Cpu) set() {
 	c.pc = 0xc000
 }
 func (c *Cpu) LoadToMem(rom *rom.Rom) {
+
 	c.cpuBus = bus{}
+	c.cpuBus.cpuTicks = 7
 	c.cpuBus.rom = rom
+	c.cpuBus.ppu = ppu.NewPPU(rom.CharRom, rom.MirorType)
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
@@ -802,24 +821,38 @@ func (c *Cpu) JMP(mode string) {
 
 }
 
-func (c *Cpu) BMI() {
+func (c *Cpu) BMI(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 7) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
-func (c *Cpu) BPL() {
+func (c *Cpu) BPL(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 7) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
 
-func (c *Cpu) BVS() {
+func (c *Cpu) BVS(tick int) {
 	toJump := c.addrMode(RELATIVE)
 
 	if hasBit(c.statusRegister, 6) {
@@ -827,10 +860,17 @@ func (c *Cpu) BVS() {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
 
-func (c *Cpu) BVC() {
+func (c *Cpu) BVC(tick int) {
 
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := c.addrMode(RELATIVE)
@@ -838,40 +878,76 @@ func (c *Cpu) BVC() {
 		c.pc = c.pc + 2
 		c.pc = c.pc + (toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
-func (c *Cpu) BCC() {
+func (c *Cpu) BCC(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
-func (c *Cpu) BEQ() {
+func (c *Cpu) BEQ(tick int) {
 
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
-func (c *Cpu) BCS() {
+func (c *Cpu) BCS(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 0) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
-func (c *Cpu) BNE() {
+func (c *Cpu) BNE(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 1) {
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
+	} else {
+		if tick == 4 {
+			tick -= 2
+		} else {
+			tick--
+		}
 	}
+	c.cpuBus.tick(tick)
 }
 func (c *Cpu) ANC(mode string) {
 
@@ -1066,37 +1142,43 @@ func (c *Cpu) Run() {
 		location := c.cpuBus.ReadSingleByte(c.pc)
 
 		mode := getAddrMode(location)
-		c.TraceExecution(mode)
+		tick := c.TraceExecution(mode)
+		switch location {
+		case 0x10, 0x30, 0x50, 0x70, 0x90, 0xb0, 0xd0, 0xf0:
+		default:
+			c.cpuBus.tick(tick)
+		}
+
 		switch location {
 		case 0x00:
 			c.BRK()
 			return
 		case 0x10:
-			c.BPL()
+			c.BPL(tick)
 		case 0x20:
 			c.JSR()
 		case 0x30:
-			c.BMI()
+			c.BMI(tick)
 		case 0x40:
 			c.RTI()
 		case 0x50:
-			c.BVC()
+			c.BVC(tick)
 		case 0x60:
 			c.RTS()
 		case 0x70:
-			c.BVS()
+			c.BVS(tick)
 		case 0x90:
-			c.BCC()
+			c.BCC(tick)
 		case 0xA0, 0xA4, 0xB4, 0xAC, 0xBC:
 			c.LDY(mode)
 		case 0xB0:
-			c.BCS()
+			c.BCS(tick)
 
 		case 0xD0:
-			c.BNE()
+			c.BNE(tick)
 
 		case 0xF0:
-			c.BEQ()
+			c.BEQ(tick)
 		case 0x01, 0x09, 0x05, 0x15, 0x0D, 0x1D, 0x19, 0x11:
 			c.ORA(mode)
 		case 0x21, 0x29, 0x25, 0x35, 0x2D, 0x3D, 0x39, 0x31:
@@ -1251,6 +1333,9 @@ func (c *Cpu) Run() {
 		if c.pc == temp {
 			val := getNumber(location)
 			if val == -1 {
+				break
+			}
+			if c.pc+uint16(val) < c.pc {
 				break
 			}
 			c.pc = c.pc + uint16(val)

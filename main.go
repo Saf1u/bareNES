@@ -32,7 +32,7 @@ func sys_test() {
 		log.Println(err)
 		return
 	}
-	sampleLog, err := os.Open("nestest_no_cycle.log")
+	sampleLog, err := os.Open("nestest.log")
 	if err != nil {
 		log.Println(err)
 		return
@@ -45,9 +45,18 @@ func sys_test() {
 	}
 
 	for {
-		if myLogConent != sampleLogContent {
+		if myLogConent[0:len(myLogConent)-1] != sampleLogContent[0:len(sampleLogContent)-2] {
+			myLogConent = myLogConent[0 : len(myLogConent)-1]
 			fmt.Println(myLogConent)
+			sampleLogContent = sampleLogContent[0 : len(sampleLogContent)-2]
 			fmt.Println(sampleLogContent)
+			// for i := 0; i < len(myLogConent); i++ {
+			// 	if myLogConent[i] != sampleLogContent[i] {
+			// 		fmt.Println(string(myLogConent[i]))
+			// 		fmt.Println(string(sampleLogContent[i-1]))
+			// 		fmt.Println(i)
+			// 	}
+			// }
 			os.Exit(0)
 		}
 		myLogConent, err = rd.ReadString('\n')

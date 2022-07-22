@@ -2,99 +2,6 @@ package ppu
 
 import "emulator/common"
 
-type Ppu struct {
-	ChrRom []uint8
-	//from rom
-	Palette [32]uint8
-	//colors
-	Ram [2048]uint8
-	//ppu mem
-	Oam [256]uint8
-	//sprite state monitoring
-	Mirror int
-
-	AddrRegister addrReg
-	OamAddr      PPU_OAM_ADDRESS
-	OamData      PPU_OAM_DATA
-	Status       PPU_STATUS_REGISTER
-	Scroll       PPU_SCROLL_REGISTER
-	//DataRegister    dataReg
-	ControlRegister PPU_CONTROL
-
-	buffer uint8
-}
-
-type PPU_OAM_ADDRESS uint8
-
-func (reg *PPU_OAM_ADDRESS) WriteAddressOam(addr uint8) {
-	*reg = PPU_OAM_ADDRESS(addr)
-}
-
-func (reg *PPU_OAM_ADDRESS) Increment() {
-	*reg++
-}
-
-type PPU_OAM_DATA uint8
-
-func (ppu *Ppu) WriteDataOam(data uint8) {
-	ppu.Oam[ppu.OamAddr] = data
-	ppu.OamAddr.Increment()
-}
-
-func (ppu *Ppu) ReadDataOamRegister() uint8 {
-	return ppu.Oam[ppu.OamAddr]
-}
-
-type PPU_OAM_DMA uint8
-
-func (ppu *Ppu) WriteOamDMA(addr uint8) {
-	charRomaddr := uint16(0x100) * uint16(addr)
-
-	for i := 0; i < 256; i++ {
-		ppu.Oam[i] = ppu.ChrRom[charRomaddr]
-		charRomaddr++
-	}
-}
-
-//sus
-func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
-	if addr >= 0x3000 && addr <= 0x3eff {
-		addr = addr & 0x2fff
-	}
-	mirror := ppu.Mirror
-	switch {
-	case mirror == common.HORIZONTAL:
-		if addr >= 0x2000 && addr <= 0x2400 {
-			return addr - 0x2000
-		}
-		if addr >= 0x2400 && addr <= 0x2800 {
-			return addr - 0x2400
-		}
-
-		if addr >= 0x2800 && addr <= 0x2c00 {
-			return (addr - 0x2800) + 0x400
-		}
-		if addr >= 0x2c00 && addr <= 0x3f00 {
-			return (addr - 0x2c00) + 0x400
-		}
-	case mirror == common.VERTICAL:
-		if addr >= 0x2000 && addr <= 0x2400 {
-			return addr - 0x2000
-		}
-		if addr >= 0x2400 && addr <= 0x2800 {
-			return addr - 0x2400 + 400
-		}
-
-		if addr >= 0x2800 && addr <= 0x2c00 {
-			return (addr - 0x2800)
-		}
-		if addr >= 0x2c00 && addr <= 0x3f00 {
-			return (addr - 0x2c00) + 0x400
-		}
-	}
-	return 0
-}
-
 const (
 	BASE_NAME_TABLE_ONE = iota
 	BASE_NAME_TABLE_TWO
@@ -112,48 +19,97 @@ const (
 	PALETTE_END   = 0x3FFF
 )
 
-func (ppu *Ppu) ReadData() uint8 {
-	addr := ppu.AddrRegister.Get()
-	val := ppu.ControlRegister.ValueToIncrementBy()
-	ppu.AddrRegister.Increment(val)
+type Ppu struct {
+	ChrRom []uint8
+	//from rom
+	Palette [32]uint8
+	//colors
+	Ram [2048]uint8
+	//ppu mem
+	Oam [256]uint8
+	//sprite state monitoring
+	Mirror int
 
-	switch {
+	AddrRegister addrReg
+	OamAddr      PPU_OAM_ADDRESS
+	OamData      PPU_OAM_DATA
+	Status       PPU_STATUS_REGISTER
+	Scroll       PPU_SCROLL_REGISTER
+	Mask         PPU_MASK
+	//DataRegister    dataReg
+	ControlRegister PPU_CONTROL
+	nmiOcurred      bool
 
-	case addr >= PALETTE_START && addr <= PALETTE_END:
-		return ppu.Palette[(addr - PALETTE_START)]
-	case addr >= CHR_ROM_START && addr <= CHR_ROM_END:
-		result := ppu.buffer
-		ppu.buffer = ppu.ChrRom[(addr)]
-		return result
-	case addr >= PPU_RAM_START && addr <= PPU_RAM_END:
-		result := ppu.buffer
-		ppu.buffer = ppu.Ram[(ppu.mirriorPPU(addr))]
-		return result
+	buffer    uint8
+	PpuTicks  int
+	Scanlines int
+}
+
+func (ppu *Ppu) Tick(amount int) {
+	ppu.PpuTicks += amount
+	if ppu.PpuTicks >= 341 {
+		ppu.PpuTicks -= 341
+		ppu.Scanlines++
+		if ppu.Scanlines == 241 {
+			ppu.Status.SetVBlank()
+			if ppu.ControlRegister.GenerateNmi() {
+				ppu.nmiOcurred = true
+			}
+		}
+		if ppu.Scanlines >= 262 {
+			ppu.Scanlines = 0
+			ppu.Status.ClearVBlank()
+			ppu.nmiOcurred = false
+		}
 	}
-	return 0
+
 }
 
-func (ppu *Ppu) WriteData(data uint8) {
-	addr := ppu.AddrRegister.Get()
+//do you want circular refrences? lol
+func (ppu *Ppu) PollNmi() bool {
+	return ppu.nmiOcurred
+}
 
-	switch {
-	case addr >= PALETTE_START && addr <= PALETTE_END:
-		ppu.Palette[(addr - PALETTE_START)] = data
-	case addr >= PPU_RAM_START && addr <= PPU_RAM_END:
-		ppu.Ram[(ppu.mirriorPPU(addr))] = data
-	case addr >= CHR_ROM_START && addr <= CHR_ROM_END:
-		ppu.ChrRom[(addr)] = data
+func NewPPU(rom []uint8, mirror int) *Ppu {
+
+	ppu := &Ppu{
+		Mirror: mirror,
+		ChrRom: rom,
 	}
+	ppu.PpuTicks = 7 * 3
 
-	val := ppu.ControlRegister.ValueToIncrementBy()
-	ppu.AddrRegister.Increment(val)
-
+	return ppu
 }
 
-type addrReg struct {
-	values [2]uint8
-	ptr    int
+type PPU_OAM_ADDRESS uint8
+
+func (reg *PPU_OAM_ADDRESS) WriteAddressOam(addr uint8) {
+	*reg = PPU_OAM_ADDRESS(addr)
 }
+
+func (reg *PPU_OAM_ADDRESS) Increment() {
+	*reg++
+}
+
+func (ppu *Ppu) WriteDataOam(data uint8) {
+	ppu.Oam[ppu.OamAddr] = data
+	ppu.OamAddr.Increment()
+}
+func (ppu *Ppu) ReadDataOamRegister() uint8 {
+	return ppu.Oam[ppu.OamAddr]
+}
+
+//sus
+func (ppu *Ppu) WriteOamDMA(addr uint8) {
+	charRomaddr := uint16(0x100) * uint16(addr)
+
+	for i := 0; i < 256; i++ {
+		ppu.Oam[i] = ppu.ChrRom[charRomaddr]
+		charRomaddr++
+	}
+}
+
+type PPU_OAM_DATA uint8
 
 type PPU_MASK uint8
 
@@ -207,6 +163,36 @@ func (ctrl *PPU_MASK) EnableRendring() bool {
 	return true
 }
 
+type addrReg struct {
+	values [2]uint8
+	ptr    int
+}
+
+func (reg *addrReg) Update(value uint8) {
+	reg.values[reg.ptr] = value
+	reg.ptr++
+	reg.ptr = (reg.ptr) % 2
+	if reg.Get() > 0x3fff {
+		reg.Set(reg.Get() & 0x3fff)
+		//mirror back to ppu registers
+	}
+}
+
+func (reg *addrReg) Get() uint16 {
+	return (uint16(reg.values[0]))<<8 | (uint16(reg.values[1]))
+}
+
+func (reg *addrReg) Set(val uint16) {
+	hi := uint8(val >> 8)
+	low := uint8(val & 0x00FF)
+	reg.values[0] = hi
+	reg.values[1] = low
+}
+
+func (reg *addrReg) Increment(val uint8) {
+	reg.Set(reg.Get() + uint16(val))
+}
+
 type PPU_CONTROL uint8
 
 func (ctrl *PPU_CONTROL) ValueToIncrementBy() uint8 {
@@ -220,14 +206,61 @@ func (ctrl *PPU_CONTROL) ValueToIncrementBy() uint8 {
 func (ctrl *PPU_CONTROL) Update(val uint8) {
 	*ctrl = PPU_CONTROL(val)
 }
+func (ctrl *PPU_CONTROL) GetBaseNameTableAddress() uint16 {
+	a := getBit(uint8(*ctrl), 0)
+	b := getBit(uint8(*ctrl), 1)
 
-func NewPPU(rom []uint8, mirror int) *Ppu {
-	ppu := &Ppu{
-		Mirror: mirror,
-		ChrRom: rom,
+	switch {
+	case a == 0 && b == 0:
+		return 0x2000
+	case a == 0 && b == 1:
+		return 0x2400
+	case a == 1 && b == 0:
+		return 0x2800
+	case a == 1 && b == 1:
+		return 0x2c00
 	}
+	return 0
+}
+func (ctrl *PPU_CONTROL) GetSpriteTableAddress() uint16 {
+	a := getBit(uint8(*ctrl), 3)
 
-	return ppu
+	switch {
+	case a == 0:
+		return 0
+	case a == 1:
+		return 0x1000
+	}
+	return 0
+}
+func (ctrl *PPU_CONTROL) GetBackgroundTableAddress() uint16 {
+	a := getBit(uint8(*ctrl), 4)
+
+	switch {
+	case a == 0:
+		return 0
+	case a == 1:
+		return 0x1000
+	}
+	return 0
+}
+func (ctrl *PPU_CONTROL) GetSpritesize() uint8 {
+	a := getBit(uint8(*ctrl), 5)
+
+	switch {
+	case a == 0:
+		return 8
+	case a == 1:
+		return 16
+	}
+	return 0
+}
+
+func (ctrl *PPU_CONTROL) GetMasterSlave() uint8 {
+	return getBit(uint8(*ctrl), 6)
+}
+func (ctrl *PPU_CONTROL) GenerateNmi() bool {
+	return hasBit(uint8(*ctrl), 7)
 }
 
 type PPU_SCROLL_REGISTER struct {
@@ -267,37 +300,98 @@ func (reg *PPU_STATUS_REGISTER) InVBlank() bool {
 	return hasBit(uint8(*reg), 7)
 }
 
+//sus
+func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
+	if addr >= 0x3000 && addr <= 0x3eff {
+		addr = addr & 0x2fff
+	}
+	mirror := ppu.Mirror
+	switch {
+	case mirror == common.HORIZONTAL:
+		if addr >= 0x2000 && addr <= 0x2400 {
+			return addr - 0x2000
+		}
+		if addr >= 0x2400 && addr <= 0x2800 {
+			return addr - 0x2400
+		}
+
+		if addr >= 0x2800 && addr <= 0x2c00 {
+			return (addr - 0x2800) + 0x400
+		}
+		if addr >= 0x2c00 && addr <= 0x3f00 {
+			return (addr - 0x2c00) + 0x400
+		}
+	case mirror == common.VERTICAL:
+		if addr >= 0x2000 && addr <= 0x2400 {
+			return addr - 0x2000
+		}
+		if addr >= 0x2400 && addr <= 0x2800 {
+			return addr - 0x2400 + 400
+		}
+
+		if addr >= 0x2800 && addr <= 0x2c00 {
+			return (addr - 0x2800)
+		}
+		if addr >= 0x2c00 && addr <= 0x3f00 {
+			return (addr - 0x2c00) + 0x400
+		}
+	}
+	return 0
+}
+
+func (ppu *Ppu) ReadData() uint8 {
+	addr := ppu.AddrRegister.Get()
+	val := ppu.ControlRegister.ValueToIncrementBy()
+	ppu.AddrRegister.Increment(val)
+
+	switch {
+
+	case addr >= PALETTE_START && addr <= PALETTE_END:
+		return ppu.Palette[(addr - PALETTE_START)]
+	case addr >= CHR_ROM_START && addr <= CHR_ROM_END:
+		result := ppu.buffer
+		ppu.buffer = ppu.ChrRom[(addr)]
+		return result
+	case addr >= PPU_RAM_START && addr <= PPU_RAM_END:
+		result := ppu.buffer
+		ppu.buffer = ppu.Ram[(ppu.mirriorPPU(addr))]
+		return result
+	}
+	return 0
+}
+
+func (ppu *Ppu) WriteData(data uint8) {
+	addr := ppu.AddrRegister.Get()
+
+	switch {
+	case addr >= PALETTE_START && addr <= PALETTE_END:
+		ppu.Palette[(addr - PALETTE_START)] = data
+	case addr >= PPU_RAM_START && addr <= PPU_RAM_END:
+		ppu.Ram[(ppu.mirriorPPU(addr))] = data
+	case addr >= CHR_ROM_START && addr <= CHR_ROM_END:
+		ppu.ChrRom[(addr)] = data
+	}
+
+	val := ppu.ControlRegister.ValueToIncrementBy()
+	ppu.AddrRegister.Increment(val)
+
+}
+func (ppu *Ppu) WriteToCtrl(val uint8) {
+	bitsBefore := uint8(ppu.ControlRegister)
+	ppu.ControlRegister.Update(val)
+	bitsAfter := uint8(ppu.ControlRegister)
+	if !hasBit(bitsBefore, 7) && hasBit(bitsAfter, 7) && ppu.Status.InVBlank() {
+		ppu.nmiOcurred = true
+	}
+	//if we were in vblank but control says we cannot generate an nmi, if we decide to set control to generate nmi while maintaining vblank status
+	//we should notify we are already in nmi
+}
 func (ppu *Ppu) ReadStatus() uint8 {
 	temp := uint8(ppu.Status)
 	ppu.Status.ClearVBlank()
 	ppu.Scroll.ptr = 0
 	ppu.AddrRegister.ptr = 0
 	return temp
-}
-
-func (reg *addrReg) Update(value uint8) {
-	reg.values[reg.ptr] = value
-	reg.ptr++
-	reg.ptr = (reg.ptr) % 2
-	if reg.Get() > 0x3fff {
-		reg.Set(reg.Get() & 0x3fff)
-		//mirror back to ppu registers
-	}
-}
-
-func (reg *addrReg) Get() uint16 {
-	return (uint16(reg.values[0]))<<8 | (uint16(reg.values[1]))
-}
-
-func (reg *addrReg) Set(val uint16) {
-	hi := uint8(val >> 8)
-	low := uint8(val & 0x00FF)
-	reg.values[0] = hi
-	reg.values[1] = low
-}
-
-func (reg *addrReg) Increment(val uint8) {
-	reg.Set(reg.Get() + uint16(val))
 }
 
 //this is a duplicate remove later
@@ -316,4 +410,12 @@ func clearBit(n uint8, pos int) uint8 {
 	var mask uint8 = ^(1 << pos)
 	n &= mask
 	return n
+}
+
+func getBit(n uint8, pos int) uint8 {
+	val := n & (1 << pos)
+	if val > 0 {
+		return 1
+	}
+	return 0
 }

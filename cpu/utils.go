@@ -56,3 +56,7 @@ func getNumber(opcode uint8) int {
 func getInst(opcode uint8) string {
 	return instructionInfo[opcode][0]
 }
+
+func getCycle(opcode uint8) string {
+	return instructionInfo[opcode][3]
+}
