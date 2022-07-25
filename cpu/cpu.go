@@ -3,6 +3,11 @@ package cpu
 import (
 	"emulator/ppu"
 	"emulator/rom"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/veandco/go-sdl2/sdl"
 )
 
 //should be 0x0600??
@@ -58,38 +63,102 @@ type Cpu struct {
 	stackPtr       uint8
 	pc             uint16
 	statusRegister uint8
-	cpuBus         bus
+	CpuBus         Bus
 }
-type bus struct {
+type Bus struct {
 	cpuRam   [2048]uint8
 	rom      *rom.Rom
-	ppu      *ppu.Ppu
+	Ppu      *ppu.Ppu
 	cpuTicks int
 }
 
-func (b *bus) tick(amount int) {
+func (b *Bus) tick(amount int) {
 	b.cpuTicks += amount
-	b.ppu.Tick(3 * amount)
+
+	res := b.Ppu.Tick(3 * amount)
+
+	if res {
+		b.Ppu.ShowTiles()
+		check := false
+		if b.Ppu.Ram[0] == 32 {
+			check = true
+			fmt.Println("lol")
+			// b.Ppu.SdlAccess(b.Ppu.Frame.Screen[:])
+		}
+		sdlI(b.Ppu.Frame.Screen[:], check)
+
+	}
 }
-func (b *bus) WriteSingleByte(addr uint16, data uint8) {
+
+func sdlI(frame []uint8, check bool) {
+	err := sdl.InitSubSystem(sdl.INIT_VIDEO)
+	defer sdl.Quit()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	window, err := sdl.CreateWindow("sdl window", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 256*3, 240*3, sdl.WINDOW_SHOWN)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	err = renderer.SetScale(3, 3)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STATIC, 256, 240)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = texture.Update(nil, frame, 256*3)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = renderer.Copy(texture, nil, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(0)
+	}
+	renderer.Present()
+	sdl.PumpEvents()
+	for check {
+		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+			switch event.(type) {
+			case *sdl.QuitEvent:
+				return
+
+			}
+
+		}
+	}
+}
+func (b *Bus) WriteSingleByte(addr uint16, data uint8) {
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
 		addr = mirror(addr)
 		b.cpuRam[addr] = data
 	case addr == PPU_DATA_REGISTER:
-		b.ppu.WriteData(data)
+		b.Ppu.WriteData(data)
 	case addr == PPU_ADDRESS_REGISTER:
-		b.ppu.AddrRegister.Update(data)
+		b.Ppu.AddrRegister.Update(data)
 	case addr == PPU_MASK_REGISTER:
-		b.ppu.Mask.Update(data)
+		b.Ppu.Mask.Update(data)
 	case addr == PPU_OAM_ADDRESS:
-		b.ppu.OamAddr.WriteAddressOam(data)
+		b.Ppu.OamAddr.WriteAddressOam(data)
 	case addr == PPU_SCROLL_REGISTER:
-		b.ppu.Scroll.Update(data)
+		b.Ppu.Scroll.Update(data)
 	case addr == PPU_OAM_DATA:
-		b.ppu.WriteDataOam(data)
+		b.Ppu.WriteDataOam(data)
 	case addr == PPU_CONTROL_REGISTER:
-		b.ppu.WriteToCtrl(data)
+		b.Ppu.WriteToCtrl(data)
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
 		b.WriteSingleByte(addr, data)
@@ -97,7 +166,7 @@ func (b *bus) WriteSingleByte(addr uint16, data uint8) {
 
 }
 
-func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
+func (b *Bus) WriteDoubleByte(addr uint16, data uint16) {
 
 	low := uint8(data & 0x00FF)
 	hi := uint8((data) >> 8)
@@ -105,7 +174,7 @@ func (b *bus) WriteDoubleByte(addr uint16, data uint16) {
 	b.WriteSingleByte(addr+1, hi)
 }
 
-func (b *bus) ReadSingleByte(addr uint16) uint8 {
+func (b *Bus) ReadSingleByte(addr uint16) uint8 {
 	var data uint8 = 0
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
@@ -114,11 +183,11 @@ func (b *bus) ReadSingleByte(addr uint16) uint8 {
 	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
 		data = b.rom.ReadRom(addr)
 	case addr == PPU_DATA_REGISTER:
-		data = b.ppu.ReadData()
+		data = b.Ppu.ReadData()
 	case addr == PPU_STATUS_REGISTER:
-		data = b.ppu.ReadStatus()
+		data = b.Ppu.ReadStatus()
 	case addr == PPU_OAM_DATA:
-		data = b.ppu.ReadDataOamRegister()
+		data = b.Ppu.ReadDataOamRegister()
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
 		b.ReadSingleByte(addr)
@@ -127,7 +196,7 @@ func (b *bus) ReadSingleByte(addr uint16) uint8 {
 	return data
 
 }
-func (b *bus) ReadDoubleByte(addr uint16) uint16 {
+func (b *Bus) ReadDoubleByte(addr uint16) uint16 {
 
 	var low uint16 = uint16(b.ReadSingleByte(addr))
 	var hi uint16 = uint16(b.ReadSingleByte(addr + 1))
@@ -147,44 +216,44 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	switch {
 	case mode == RELATIVE:
 		loc := c.pc + 1
-		toJump := int8(c.cpuBus.ReadSingleByte(loc))
+		toJump := int8(c.CpuBus.ReadSingleByte(loc))
 		dataLocation = uint16(toJump)
 	case mode == IMMEDIATE:
 		dataLocation = c.pc + 1
 	case mode == ABSOLUTE:
-		dataLocation = c.cpuBus.ReadDoubleByte(c.pc + 1)
+		dataLocation = c.CpuBus.ReadDoubleByte(c.pc + 1)
 	case mode == ZERO_PAGE_X:
-		data := c.cpuBus.ReadSingleByte(c.pc + 1)
+		data := c.CpuBus.ReadSingleByte(c.pc + 1)
 		var n uint8 = data + c.xRegister
 		dataLocation = uint16(n)
 	case mode == ZERO_PAGE_Y:
-		data := c.cpuBus.ReadSingleByte(c.pc + 1)
+		data := c.CpuBus.ReadSingleByte(c.pc + 1)
 		var n uint8 = data + c.yRegister
 		dataLocation = uint16(n)
 	case mode == ABSOLUTE_X:
-		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
+		data := c.CpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.xRegister)
 	case mode == ABSOLUTE_Y:
-		data := c.cpuBus.ReadDoubleByte(c.pc + 1)
+		data := c.CpuBus.ReadDoubleByte(c.pc + 1)
 		dataLocation = data + uint16(c.yRegister)
 	case mode == INDIRECT_X:
-		base := uint16(c.cpuBus.ReadSingleByte(c.pc+1) + (c.xRegister))
-		low := uint16(c.cpuBus.ReadSingleByte(uint16(base)))
+		base := uint16(c.CpuBus.ReadSingleByte(c.pc+1) + (c.xRegister))
+		low := uint16(c.CpuBus.ReadSingleByte(uint16(base)))
 		temp := uint8(base + 1)
-		hi := uint16(c.cpuBus.ReadSingleByte(uint16(temp)))
+		hi := uint16(c.CpuBus.ReadSingleByte(uint16(temp)))
 		dataLocation = (hi << 8) | low
 	case mode == INDIRECT_Y:
-		pos := uint16(c.cpuBus.ReadSingleByte(c.pc + 1))
-		low := c.cpuBus.ReadSingleByte(pos)
+		pos := uint16(c.CpuBus.ReadSingleByte(c.pc + 1))
+		low := c.CpuBus.ReadSingleByte(pos)
 		temp := uint8(pos + 1)
-		hi := c.cpuBus.ReadSingleByte(uint16(temp))
+		hi := c.CpuBus.ReadSingleByte(uint16(temp))
 		loc := uint16(hi)<<8 | uint16(low)
 		dataLocation = loc + uint16(c.yRegister)
 	case mode == ZERO_PAGE:
-		data := c.cpuBus.ReadSingleByte(c.pc + 1)
+		data := c.CpuBus.ReadSingleByte(c.pc + 1)
 		dataLocation = uint16(data)
 	case mode == INDIRECT:
-		dataLocation = c.cpuBus.ReadDoubleByte(c.pc + 1)
+		dataLocation = c.CpuBus.ReadDoubleByte(c.pc + 1)
 
 	}
 
@@ -198,14 +267,15 @@ func (c *Cpu) set() {
 	c.yRegister = 0
 	c.statusRegister = 0x24
 	c.stackPtr = STACK
-	c.pc = 0xc000
+	c.pc = c.CpuBus.ReadDoubleByte(0xfffc)
 }
 func (c *Cpu) LoadToMem(rom *rom.Rom) {
 
-	c.cpuBus = bus{}
-	c.cpuBus.cpuTicks = 7
-	c.cpuBus.rom = rom
-	c.cpuBus.ppu = ppu.NewPPU(rom.CharRom, rom.MirorType)
+	c.CpuBus = Bus{}
+	c.CpuBus.cpuTicks = 0
+	c.CpuBus.rom = rom
+	c.CpuBus.Ppu = ppu.NewPPU(rom.CharRom, rom.MirorType)
+	c.CpuBus.Ppu.PpuTicks = c.CpuBus.cpuTicks * 3
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
@@ -279,7 +349,7 @@ func (c *Cpu) LAX(mode string) {
 
 func (c *Cpu) LDX(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	c.alterZeroAndNeg(data)
 
 	c.xRegister = data
@@ -287,14 +357,14 @@ func (c *Cpu) LDX(mode string) {
 
 func (c *Cpu) LDY(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	c.alterZeroAndNeg(data)
 
 	c.yRegister = data
 }
 func (c *Cpu) SBC(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 
 	data = ^data
 
@@ -355,7 +425,7 @@ func (c *Cpu) SBC(mode string) {
 
 func (c *Cpu) ADC(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 
 	t := (c.aRegister) + (data)
 	if hasBit(c.statusRegister, CARRY_FLAG) {
@@ -396,22 +466,22 @@ func (c *Cpu) ADC(mode string) {
 
 func (c *Cpu) STA(mode string) {
 	loc := c.addrMode(mode)
-	c.cpuBus.WriteSingleByte(loc, c.aRegister)
+	c.CpuBus.WriteSingleByte(loc, c.aRegister)
 }
 func (c *Cpu) STX(mode string) {
 	loc := c.addrMode(mode)
 
-	c.cpuBus.WriteSingleByte(loc, c.xRegister)
+	c.CpuBus.WriteSingleByte(loc, c.xRegister)
 }
 func (c *Cpu) STY(mode string) {
 	loc := c.addrMode(mode)
 
-	c.cpuBus.WriteSingleByte(loc, c.yRegister)
+	c.CpuBus.WriteSingleByte(loc, c.yRegister)
 }
 func (c *Cpu) SAX(mode string) {
 	loc := c.addrMode(mode)
 	data := c.aRegister & c.xRegister
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 }
 
 func (c *Cpu) TAX() {
@@ -450,7 +520,7 @@ func (c *Cpu) TSX() {
 
 func (c *Cpu) AND(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	if len(hidden) != 0 {
 		data = *hidden[0]
 	}
@@ -462,7 +532,7 @@ func (c *Cpu) AND(mode string, hidden ...*uint8) {
 func (c *Cpu) ORA(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
 
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	if len(hidden) != 0 {
 		data = *(hidden[0])
 	}
@@ -473,7 +543,7 @@ func (c *Cpu) ORA(mode string, hidden ...*uint8) {
 
 func (c *Cpu) EOR(mode string, hidden ...*uint8) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	if len(hidden) != 0 {
 		data = *hidden[0]
 	}
@@ -507,25 +577,25 @@ func (c *Cpu) DEY() {
 
 func (c *Cpu) INC(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	data++
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 	c.alterZeroAndNeg(data)
 
 }
 
 func (c *Cpu) DEC(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	data--
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 	c.alterZeroAndNeg(data)
 
 }
 
 func (c *Cpu) CMP(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	temp := c.aRegister - data
 	if c.aRegister >= data {
 		c.SEC()
@@ -547,7 +617,7 @@ func (c *Cpu) CMP(mode string) {
 
 func (c *Cpu) CPX(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	temp := c.xRegister - data
 	if c.xRegister >= data {
 		c.SEC()
@@ -568,7 +638,7 @@ func (c *Cpu) CPX(mode string) {
 }
 func (c *Cpu) CPY(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	temp := c.yRegister - data
 	if c.yRegister >= data {
 		c.SEC()
@@ -590,7 +660,7 @@ func (c *Cpu) CPY(mode string) {
 
 func (c *Cpu) BIT(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	temp := data & c.aRegister
 	if temp == 0 {
 		c.SetZero()
@@ -617,7 +687,7 @@ func (c *Cpu) LSR(mode string) {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
-		data = c.cpuBus.ReadSingleByte(loc)
+		data = c.CpuBus.ReadSingleByte(loc)
 	}
 	if hasBit(data, 0) {
 		c.SEC()
@@ -628,7 +698,7 @@ func (c *Cpu) LSR(mode string) {
 	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
+		c.CpuBus.WriteSingleByte(loc, data)
 	}
 	c.ClearNegative()
 	if data == 0 {
@@ -651,7 +721,7 @@ func (c *Cpu) ASL(mode string) {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
-		data = c.cpuBus.ReadSingleByte(loc)
+		data = c.CpuBus.ReadSingleByte(loc)
 	}
 	if hasBit(data, 7) {
 		c.SEC()
@@ -662,7 +732,7 @@ func (c *Cpu) ASL(mode string) {
 	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
+		c.CpuBus.WriteSingleByte(loc, data)
 	}
 	c.alterZeroAndNeg(data)
 
@@ -675,7 +745,7 @@ func (c *Cpu) ROL(mode string) {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
-		data = c.cpuBus.ReadSingleByte(loc)
+		data = c.CpuBus.ReadSingleByte(loc)
 	}
 
 	temp := c.GetBit(CARRY_FLAG)
@@ -689,7 +759,7 @@ func (c *Cpu) ROL(mode string) {
 	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
+		c.CpuBus.WriteSingleByte(loc, data)
 	}
 
 	if templast > 0 {
@@ -719,7 +789,7 @@ func (c *Cpu) SRE(mode string) {
 }
 func (c *Cpu) AXS(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	c.xRegister = c.xRegister & c.aRegister
 	if data <= c.xRegister {
 		c.SEC()
@@ -731,7 +801,7 @@ func (c *Cpu) AXS(mode string) {
 
 func (c *Cpu) ARR(mode string) {
 	loc := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	c.AND(mode, &data)
 	c.aRegister = data & c.aRegister
 	c.ROR(ACCUMULATOR)
@@ -764,7 +834,7 @@ func (c *Cpu) ROR(mode string) {
 		data = c.Acc()
 	} else {
 		loc = c.addrMode(mode)
-		data = c.cpuBus.ReadSingleByte(loc)
+		data = c.CpuBus.ReadSingleByte(loc)
 	}
 	temp := c.GetBit(CARRY_FLAG)
 	templast := getBit(data, 0)
@@ -777,7 +847,7 @@ func (c *Cpu) ROR(mode string) {
 	if mode == ACCUMULATOR {
 		c.aRegister = data
 	} else {
-		c.cpuBus.WriteSingleByte(loc, data)
+		c.CpuBus.WriteSingleByte(loc, data)
 	}
 
 	if templast > 0 {
@@ -804,16 +874,16 @@ func (c *Cpu) JMP(mode string) {
 	if mode == ABSOLUTE {
 		c.pc = c.addrMode(ABSOLUTE)
 	} else {
-		loc := c.cpuBus.ReadDoubleByte(c.pc + 1)
+		loc := c.CpuBus.ReadDoubleByte(c.pc + 1)
 		//6502 HAS A WEIRD WRAPAROUND BUG THAT CAUSES AN ADDRESS TO BE READ BACKWARD IN AN INDIRECT JUMP WE NEED TO REMAIN TRUE TO THIS
 		//
 		if loc&0x00ff == 0x00ff {
-			low := uint16(c.cpuBus.ReadSingleByte(loc))
-			hi := uint16(c.cpuBus.ReadSingleByte(loc & 0xFF00))
+			low := uint16(c.CpuBus.ReadSingleByte(loc))
+			hi := uint16(c.CpuBus.ReadSingleByte(loc & 0xFF00))
 			fin := hi<<8 | low
 			c.pc = fin
 		} else {
-			fin := c.cpuBus.ReadDoubleByte(loc)
+			fin := c.CpuBus.ReadDoubleByte(loc)
 			c.pc = fin
 		}
 
@@ -834,7 +904,7 @@ func (c *Cpu) BMI(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) BPL(tick int) {
 	toJump := c.addrMode(RELATIVE)
@@ -849,7 +919,7 @@ func (c *Cpu) BPL(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 
 func (c *Cpu) BVS(tick int) {
@@ -867,7 +937,7 @@ func (c *Cpu) BVS(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 
 func (c *Cpu) BVC(tick int) {
@@ -885,7 +955,7 @@ func (c *Cpu) BVC(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) BCC(tick int) {
 	toJump := c.addrMode(RELATIVE)
@@ -901,7 +971,7 @@ func (c *Cpu) BCC(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) BEQ(tick int) {
 
@@ -917,7 +987,7 @@ func (c *Cpu) BEQ(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) BCS(tick int) {
 	toJump := c.addrMode(RELATIVE)
@@ -932,7 +1002,7 @@ func (c *Cpu) BCS(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) BNE(tick int) {
 	toJump := c.addrMode(RELATIVE)
@@ -947,7 +1017,7 @@ func (c *Cpu) BNE(tick int) {
 			tick--
 		}
 	}
-	c.cpuBus.tick(tick)
+	c.CpuBus.tick(tick)
 }
 func (c *Cpu) ANC(mode string) {
 
@@ -973,9 +1043,9 @@ func (c *Cpu) RRA(mode string) {
 
 func (c *Cpu) DCP(mode string) {
 	location := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(location)
+	data := c.CpuBus.ReadSingleByte(location)
 	data--
-	c.cpuBus.WriteSingleByte(location, data)
+	c.CpuBus.WriteSingleByte(location, data)
 	if data <= c.aRegister {
 		c.SEC()
 	}
@@ -985,7 +1055,7 @@ func (c *Cpu) DCP(mode string) {
 
 func (c *Cpu) XAA(mode string) {
 	location := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(location)
+	data := c.CpuBus.ReadSingleByte(location)
 	c.aRegister = c.xRegister
 	c.alterZeroAndNeg(c.aRegister)
 	c.AND(mode, &data)
@@ -994,7 +1064,7 @@ func (c *Cpu) XAA(mode string) {
 
 func (c *Cpu) LAS(mode string) {
 	location := c.addrMode(mode)
-	data := c.cpuBus.ReadSingleByte(location)
+	data := c.CpuBus.ReadSingleByte(location)
 	c.stackPtr = c.stackPtr & data
 	c.aRegister = c.stackPtr & data
 	c.xRegister = c.stackPtr & data
@@ -1007,26 +1077,26 @@ func (c *Cpu) TAS(mode string) {
 	c.stackPtr = data
 	loc := c.addrMode(mode)
 	data = (uint8(loc>>8) + 1) & data
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 
 }
 func (c *Cpu) AHX(mode string) {
 	data := c.aRegister & c.xRegister
 	loc := c.addrMode(mode)
 	data = (uint8(loc>>8) + 1) & data
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 }
 func (c *Cpu) SHX(mode string) {
 	data := c.xRegister
 	loc := c.addrMode(mode)
 	data = (uint8(loc>>8) + 1) & data
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 }
 func (c *Cpu) SHY(mode string) {
 	data := c.yRegister
 	loc := c.addrMode(mode)
 	data = (uint8(loc>>8) + 1) & data
-	c.cpuBus.WriteSingleByte(loc, data)
+	c.CpuBus.WriteSingleByte(loc, data)
 }
 
 func (c *Cpu) RLA(mode string) {
@@ -1062,17 +1132,28 @@ func (c *Cpu) PLA() {
 	c.alterZeroAndNeg(acc)
 	c.aRegister = acc
 }
+func (c *Cpu) ExecuteNMI() {
+	temp := setBit(c.statusRegister, 5)
+	temp = clearBit(temp, BREAK_FLAG)
+	//hardware interrupt by ppu clear break??
+	c.PushDouble(c.pc)
+	c.Push(temp)
+	c.SEI()
+	data := c.CpuBus.ReadDoubleByte(0xfffa)
+	c.pc = data
+	c.CpuBus.tick(2)
+}
 func (c *Cpu) RTI() {
 	c.statusRegister = c.Pop()
 	c.pc = c.PopDouble()
 	c.ClearBreak()
 	c.statusRegister = setBit(c.statusRegister, 5)
-
 }
 func (c *Cpu) BRK() {
 	c.Push(c.statusRegister)
 	c.PushDouble(c.pc)
 	c.SEI()
+	c.pc = c.CpuBus.ReadDoubleByte(0xfffe)
 }
 
 func (c *Cpu) PLP() {
@@ -1085,7 +1166,7 @@ func (c *Cpu) PLP() {
 func (c *Cpu) LDA(mode string) {
 	loc := c.addrMode(mode)
 
-	data := c.cpuBus.ReadSingleByte(loc)
+	data := c.CpuBus.ReadSingleByte(loc)
 	if data == 0 {
 		c.SetZero()
 	} else {
@@ -1110,7 +1191,7 @@ func (c *Cpu) NOP(mode string) {
 
 func (c *Cpu) Push(val uint8) {
 	loc := 0x0100 + uint16(c.stackPtr)
-	c.cpuBus.WriteSingleByte(loc, val)
+	c.CpuBus.WriteSingleByte(loc, val)
 	c.stackPtr--
 }
 func (c *Cpu) PushDouble(val uint16) {
@@ -1129,29 +1210,33 @@ func (c *Cpu) Pop() uint8 {
 	c.stackPtr++
 	//stack grows down
 	loc := 0x0100 + uint16(c.stackPtr)
-	temp := c.cpuBus.ReadSingleByte(loc)
+	temp := c.CpuBus.ReadSingleByte(loc)
 	return temp
 }
 
 func (c *Cpu) Run() {
+	fl, err := os.OpenFile("tracer.log", os.O_RDWR, 0755)
+	defer fl.Close()
+	if err != nil {
+		return
+	}
 	c.set()
 	for {
 
+		if c.CpuBus.Ppu.PollNmi() {
+			c.CpuBus.Ppu.NmiOcurred = false
+			c.ExecuteNMI()
+		}
+
 		temp := c.pc
 
-		location := c.cpuBus.ReadSingleByte(c.pc)
-
+		location := c.CpuBus.ReadSingleByte(c.pc)
 		mode := getAddrMode(location)
-		tick := c.TraceExecution(mode)
-		switch location {
-		case 0x10, 0x30, 0x50, 0x70, 0x90, 0xb0, 0xd0, 0xf0:
-		default:
-			c.cpuBus.tick(tick)
-		}
+		tick := c.TraceExecution(mode, fl)
 
 		switch location {
 		case 0x00:
-			c.BRK()
+			//c.BRK()
 			return
 		case 0x10:
 			c.BPL(tick)
@@ -1328,6 +1413,11 @@ func (c *Cpu) Run() {
 		case 0x9c:
 			c.SHY(mode)
 
+		}
+		switch location {
+		case 0x10, 0x30, 0x50, 0x70, 0x90, 0xb0, 0xd0, 0xf0:
+		default:
+			c.CpuBus.tick(tick)
 		}
 
 		if c.pc == temp {

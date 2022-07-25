@@ -2,23 +2,78 @@ package main
 
 import (
 	"bufio"
+	"emulator/cpu"
+	"emulator/rom"
 	"fmt"
 	"log"
 	"os"
 )
 
 func main() {
-	// cpu := &cpu.Cpu{}
-	// rom, err := rom.NewRom("nest.nes")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// cpu.LoadToMem(rom)
-	// cpu.Run()
 
-	sys_test()
+	rom, err := rom.NewRom("nest.nes")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(0)
+	}
+	//game := rom.CharRom
+	cpu := &cpu.Cpu{}
 
+	cpu.LoadToMem(rom)
+
+	cpu.Run()
 }
+
+// func sdlI(frame []uint8) {
+// 	err := sdl.InitSubSystem(sdl.INIT_VIDEO)
+// 	defer sdl.Quit()
+// 	if err != nil {
+// 		log.Println(err)
+// 		return
+// 	}
+// 	window, err := sdl.CreateWindow("sdl window", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 256*3, 240*3, sdl.WINDOW_SHOWN)
+// 	if err != nil {
+// 		log.Println(err)
+// 		return
+// 	}
+// 	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC)
+// 	if err != nil {
+// 		log.Println(err)
+// 		return
+// 	}
+
+// 	err = renderer.SetScale(3, 3)
+// 	if err != nil {
+// 		log.Println(err)
+// 		return
+// 	}
+// 	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STATIC, 256, 240)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+
+// 	err = texture.Update(nil, frame, 256*3)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// 	err = renderer.Copy(texture, nil, nil)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		os.Exit(0)
+// 	}
+// 	renderer.Present()
+// 	sdl.PumpEvents()
+// 	for true {
+// 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+// 			switch event.(type) {
+// 			case *sdl.QuitEvent:
+// 				return
+
+// 			}
+
+// 		}
+// 	}
+// }
 
 func sys_test() {
 	myLog, err := os.Open("mine.log")

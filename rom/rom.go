@@ -40,7 +40,7 @@ func NewRom(file string) (*Rom, error) {
 	if inesVer != 0 {
 		return nil, errors.New("not 1.0")
 	}
-	if ctrlByteOne&0b010000000 == 0 {
+	if ctrlByteOne&0b010000000 != 0 {
 		rom.MirorType = common.FOUR_SCREEN
 	} else {
 		if ctrlByteOne&0b1 == 0 {
@@ -50,6 +50,7 @@ func NewRom(file string) (*Rom, error) {
 		}
 	}
 	maxProg := uint(content[4]) * progRom
+
 	maxChar := uint(content[5]) * charRom
 	i := uint(16)
 	if (content[6])&0b100 == 0 {
@@ -58,11 +59,11 @@ func NewRom(file string) (*Rom, error) {
 	i = uint(16)
 	//implement trainer check
 
-	for ; i < maxProg; i++ {
+	for ; i < maxProg+16; i++ {
 
 		rom.ProgramRom = append(rom.ProgramRom, uint8(content[i]))
 	}
-	for i := maxProg; i < maxProg+maxChar; i++ {
+	for i := maxProg + 16; i < maxProg+maxChar; i++ {
 
 		rom.CharRom = append(rom.CharRom, uint8(content[i]))
 	}

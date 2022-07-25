@@ -9,32 +9,32 @@ import (
 func TestReadSingleByte(t *testing.T) {
 	var low uint8 = 0b10101011
 	cpu := &Cpu{}
-	cpu.cpuBus.cpuRam[0] = low
-	assert.Equal(t, low, cpu.cpuBus.ReadSingleByte(0))
+	cpu.CpuBus.cpuRam[0] = low
+	assert.Equal(t, low, cpu.CpuBus.ReadSingleByte(0))
 }
 
 func TestReadDoubleyte(t *testing.T) {
 	var low uint8 = 0b10101011
 	var hi uint8 = 0b10101010
 	cpu := &Cpu{}
-	cpu.cpuBus.cpuRam[0] = low
-	cpu.cpuBus.cpuRam[1] = hi
-	assert.Equal(t, uint16(0b1010101010101011), cpu.cpuBus.ReadDoubleByte(0))
+	cpu.CpuBus.cpuRam[0] = low
+	cpu.CpuBus.cpuRam[1] = hi
+	assert.Equal(t, uint16(0b1010101010101011), cpu.CpuBus.ReadDoubleByte(0))
 }
 func TestWriteSingleByte(t *testing.T) {
 	var low uint8 = 0b10101011
 	cpu := &Cpu{}
-	cpu.cpuBus.WriteSingleByte(0, low)
-	assert.Equal(t, low, cpu.cpuBus.cpuRam[0])
+	cpu.CpuBus.WriteSingleByte(0, low)
+	assert.Equal(t, low, cpu.CpuBus.cpuRam[0])
 }
 
 func TestWriteDoubleyte(t *testing.T) {
 	var low uint8 = 0b10101011
 	var hi uint8 = 0b10101010
 	cpu := &Cpu{}
-	cpu.cpuBus.WriteDoubleByte(0, 0b1010101010101011)
-	assert.Equal(t, low, cpu.cpuBus.cpuRam[0])
-	assert.Equal(t, hi, cpu.cpuBus.cpuRam[1])
+	cpu.CpuBus.WriteDoubleByte(0, 0b1010101010101011)
+	assert.Equal(t, low, cpu.CpuBus.cpuRam[0])
+	assert.Equal(t, hi, cpu.CpuBus.cpuRam[1])
 }
 
 func TestAddrModes(t *testing.T) {
@@ -42,7 +42,7 @@ func TestAddrModes(t *testing.T) {
 		val := uint8(0x11)
 		cpu := &Cpu{}
 		cpu.pc = 0
-		cpu.cpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[1] = 0x11
 		location := cpu.addrMode(RELATIVE)
 		assert.Equal(t, location, uint16(val))
 	})
@@ -57,8 +57,8 @@ func TestAddrModes(t *testing.T) {
 	t.Run("test absolute", func(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[2] = 0x31
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[2] = 0x31
 		location := cpu.addrMode(ABSOLUTE)
 		assert.Equal(t, location, uint16(0x3111))
 	})
@@ -66,7 +66,7 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.xRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[1] = 0x11
 		location := cpu.addrMode(ZERO_PAGE_X)
 		assert.Equal(t, location, uint16(0x11+0x11))
 	})
@@ -74,7 +74,7 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.yRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[1] = 0x11
 		location := cpu.addrMode(ZERO_PAGE_Y)
 		assert.Equal(t, location, uint16(0x11+0x11))
 	})
@@ -83,8 +83,8 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.xRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[2] = 0x31
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[2] = 0x31
 		location := cpu.addrMode(ABSOLUTE_X)
 		assert.Equal(t, location, uint16(0x3111+0x11))
 	})
@@ -92,8 +92,8 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.yRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[2] = 0x31
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[2] = 0x31
 		location := cpu.addrMode(ABSOLUTE_Y)
 		assert.Equal(t, location, uint16(0x3111+0x11))
 	})
@@ -102,9 +102,9 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.xRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[0x11+0x11] = 0x31
-		cpu.cpuBus.cpuRam[0x11+0x11+1] = 0x21
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[0x11+0x11] = 0x31
+		cpu.CpuBus.cpuRam[0x11+0x11+1] = 0x21
 		location := cpu.addrMode(INDIRECT_X)
 		assert.Equal(t, location, uint16(0x2131))
 	})
@@ -113,10 +113,10 @@ func TestAddrModes(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.yRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[0x11] = 0x31
-		cpu.cpuBus.cpuRam[0x11+1] = 0x81
-		cpu.cpuBus.cpuRam[0x11+0x11+1] = 0x21
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[0x11] = 0x31
+		cpu.CpuBus.cpuRam[0x11+1] = 0x81
+		cpu.CpuBus.cpuRam[0x11+0x11+1] = 0x21
 		location := cpu.addrMode(INDIRECT_Y)
 		assert.Equal(t, location, uint16(0x8131)+uint16(0x11))
 	})
@@ -124,15 +124,15 @@ func TestAddrModes(t *testing.T) {
 	t.Run("test zeroPage", func(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
-		cpu.cpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[1] = 0x11
 		location := cpu.addrMode(ZERO_PAGE)
 		assert.Equal(t, location, uint16(0x11))
 	})
 	t.Run("test indirect", func(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
-		cpu.cpuBus.cpuRam[1] = 0x11
-		cpu.cpuBus.cpuRam[2] = 0x32
+		cpu.CpuBus.cpuRam[1] = 0x11
+		cpu.CpuBus.cpuRam[2] = 0x32
 		location := cpu.addrMode(INDIRECT)
 		assert.Equal(t, location, uint16(0x3211))
 	})
@@ -154,7 +154,7 @@ func TestLDX(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cpu := &Cpu{}
 			cpu.pc = 0
-			cpu.cpuBus.cpuRam[1] = tt.data
+			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDX(IMMEDIATE)
 			assert.Equal(t, cpu.xRegister, tt.data)
 			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
@@ -177,7 +177,7 @@ func TestLDA(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cpu := &Cpu{}
 			cpu.pc = 0
-			cpu.cpuBus.cpuRam[1] = tt.data
+			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDA(IMMEDIATE)
 			assert.Equal(t, cpu.aRegister, tt.data)
 			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
@@ -201,7 +201,7 @@ func TestLDY(t *testing.T) {
 		t.Run(tt.description, func(t *testing.T) {
 			cpu := &Cpu{}
 			cpu.pc = 0
-			cpu.cpuBus.cpuRam[1] = tt.data
+			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDY(IMMEDIATE)
 			assert.Equal(t, cpu.yRegister, tt.data)
 			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
@@ -215,25 +215,25 @@ func TestStores(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.aRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x05
+		cpu.CpuBus.cpuRam[1] = 0x05
 		cpu.STA(ZERO_PAGE)
-		assert.Equal(t, cpu.cpuBus.cpuRam[0x05], uint8(0x11))
+		assert.Equal(t, cpu.CpuBus.cpuRam[0x05], uint8(0x11))
 	})
 	t.Run("stx", func(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.xRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x05
+		cpu.CpuBus.cpuRam[1] = 0x05
 		cpu.STX(ZERO_PAGE)
-		assert.Equal(t, cpu.cpuBus.cpuRam[0x05], uint8(0x11))
+		assert.Equal(t, cpu.CpuBus.cpuRam[0x05], uint8(0x11))
 	})
 	t.Run("sty", func(t *testing.T) {
 		cpu := &Cpu{}
 		cpu.pc = 0
 		cpu.yRegister = 0x11
-		cpu.cpuBus.cpuRam[1] = 0x05
+		cpu.CpuBus.cpuRam[1] = 0x05
 		cpu.STY(ZERO_PAGE)
-		assert.Equal(t, cpu.cpuBus.cpuRam[0x05], uint8(0x11))
+		assert.Equal(t, cpu.CpuBus.cpuRam[0x05], uint8(0x11))
 	})
 
 }

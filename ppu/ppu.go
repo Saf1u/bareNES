@@ -1,6 +1,9 @@
 package ppu
 
-import "emulator/common"
+import (
+	"emulator/common"
+	"emulator/render"
+)
 
 const (
 	BASE_NAME_TABLE_ONE = iota
@@ -38,36 +41,98 @@ type Ppu struct {
 	Mask         PPU_MASK
 	//DataRegister    dataReg
 	ControlRegister PPU_CONTROL
-	nmiOcurred      bool
+	NmiOcurred      bool
 
 	buffer    uint8
 	PpuTicks  int
 	Scanlines int
+	Frame     render.Frame
 }
 
-func (ppu *Ppu) Tick(amount int) {
+func (ppu *Ppu) ShowTiles() {
+
+	col0 := [3]uint8{0x00, 0x3d, 0xa6}
+	col1 := [3]uint8{0xd6, 0x32, 0x00}
+	col2 := [3]uint8{0x00, 0x8a, 0x55}
+	col3 := [3]uint8{0x09, 0x09, 0x09}
+
+	//4kb banks hence the multiplication
+
+	//each tile is an 8x8 box with each line repesenting 8 bits aka 1 byte hence 1 tile is 8bytes.Color
+	//info is tored in the next occuring 8 bytes for the earloer 8 bytes giving a total of 16 bytes
+	//if my hypothesis of 4kb pages is right we only have 2 pages for 8kb of data aka 512 tiles at at 128 bits (colorn included)
+	width := 0
+	height := 0
+	//SCREEN OFFSETS
+	bank := uint16(0)
+	for i := 0; i <= 0x3c0; i++ {
+		tileNum := uint16(ppu.Ram[i])
+		tile := ppu.ChrRom[((bank * 0x1000) + tileNum*16) : (bank*0x1000)+tileNum*16+16]
+		for y := 0; y < 8; y++ {
+			upper := tile[y]
+			lower := tile[y+8]
+			for x := 7; x >= 0; x-- {
+				col := upper&1<<1 | lower&1
+				upper = upper >> 1
+				lower = lower >> 1
+				switch col {
+				case 0:
+					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col0)
+				case 1:
+					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col1)
+				case 2:
+					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col2)
+				case 3:
+					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col3)
+				}
+			}
+		}
+		// tileNum++
+		// if tileNum == 256 {
+		// 	tileNum = 0
+		// 	bank++
+		// }
+		// if bank == 2 {
+		// 	break
+		// }
+		width++
+		if width == 32 {
+			height++
+			width = 0
+		}
+
+	}
+}
+
+func (ppu *Ppu) Tick(amount int) bool {
 	ppu.PpuTicks += amount
 	if ppu.PpuTicks >= 341 {
+
 		ppu.PpuTicks -= 341
 		ppu.Scanlines++
+		//fmt.Println(ppu.Scanlines)
 		if ppu.Scanlines == 241 {
+
 			ppu.Status.SetVBlank()
+			ppu.Status.ClearSpriteZero()
 			if ppu.ControlRegister.GenerateNmi() {
-				ppu.nmiOcurred = true
+				ppu.NmiOcurred = true
 			}
 		}
 		if ppu.Scanlines >= 262 {
+			ppu.Status.ClearSpriteZero()
 			ppu.Scanlines = 0
 			ppu.Status.ClearVBlank()
-			ppu.nmiOcurred = false
+			ppu.NmiOcurred = false
+			return true
 		}
 	}
-
+	return false
 }
 
 //do you want circular refrences? lol
 func (ppu *Ppu) PollNmi() bool {
-	return ppu.nmiOcurred
+	return ppu.NmiOcurred
 }
 
 func NewPPU(rom []uint8, mirror int) *Ppu {
@@ -76,7 +141,7 @@ func NewPPU(rom []uint8, mirror int) *Ppu {
 		Mirror: mirror,
 		ChrRom: rom,
 	}
-	ppu.PpuTicks = 7 * 3
+	//	ppu.PpuTicks = 7 * 3
 
 	return ppu
 }
@@ -305,42 +370,53 @@ func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
 	if addr >= 0x3000 && addr <= 0x3eff {
 		addr = addr & 0x2fff
 	}
+	index := addr - 0x2000
+	table := index / 0x400
+
 	mirror := ppu.Mirror
+
 	switch {
-	case mirror == common.HORIZONTAL:
-		if addr >= 0x2000 && addr <= 0x2400 {
-			return addr - 0x2000
-		}
-		if addr >= 0x2400 && addr <= 0x2800 {
-			return addr - 0x2400
-		}
+	case mirror == common.HORIZONTAL && table == 3 || mirror == common.VERTICAL && table == 2 || mirror == common.VERTICAL && table == 3:
+		index = index - 0x800
+		// if addr >= 0x2000 && addr <= 0x2400 {
+		// 	return addr - 0x2000
+		// }
+		// if addr >= 0x2400 && addr <= 0x2800 {
+		// 	return addr - 0x2400
+		// }
 
-		if addr >= 0x2800 && addr <= 0x2c00 {
-			return (addr - 0x2800) + 0x400
-		}
-		if addr >= 0x2c00 && addr <= 0x3f00 {
-			return (addr - 0x2c00) + 0x400
-		}
-	case mirror == common.VERTICAL:
-		if addr >= 0x2000 && addr <= 0x2400 {
-			return addr - 0x2000
-		}
-		if addr >= 0x2400 && addr <= 0x2800 {
-			return addr - 0x2400 + 400
-		}
+		// if addr >= 0x2800 && addr <= 0x2c00 {
+		// 	return (addr - 0x2800) + 0x400
+		// }
+		// if addr >= 0x2c00 && addr <= 0x3f00 {
+		// 	return (addr - 0x2c00) + 0x400
+		//}
+	case mirror == common.HORIZONTAL && table == 2 || mirror == common.HORIZONTAL && table == 1:
+		index = index - 0x400
+		// if addr >= 0x2000 && addr <= 0x2400 {
+		// 	return addr - 0x2000
+		// }
+		// if addr >= 0x2400 && addr <= 0x2800 {
+		// 	return addr - 0x2400 + 400
+		// }
 
-		if addr >= 0x2800 && addr <= 0x2c00 {
-			return (addr - 0x2800)
-		}
-		if addr >= 0x2c00 && addr <= 0x3f00 {
-			return (addr - 0x2c00) + 0x400
-		}
+		// if addr >= 0x2800 && addr <= 0x2c00 {
+		// 	return (addr - 0x2800)
+		// }
+		// if addr >= 0x2c00 && addr <= 0x3f00 {
+		// 	return (addr - 0x2c00) + 0x400
+		// }
 	}
-	return 0
+	return index
 }
 
 func (ppu *Ppu) ReadData() uint8 {
+
 	addr := ppu.AddrRegister.Get()
+	switch addr {
+	case 0x3f10, 0x3f14, 0x3f18, 0x3f1c:
+		addr = addr - 10
+	}
 	val := ppu.ControlRegister.ValueToIncrementBy()
 	ppu.AddrRegister.Increment(val)
 
@@ -362,6 +438,10 @@ func (ppu *Ppu) ReadData() uint8 {
 
 func (ppu *Ppu) WriteData(data uint8) {
 	addr := ppu.AddrRegister.Get()
+	switch addr {
+	case 0x3f10, 0x3f14, 0x3f18, 0x3f1c:
+		addr = addr - 10
+	}
 
 	switch {
 	case addr >= PALETTE_START && addr <= PALETTE_END:
@@ -381,7 +461,7 @@ func (ppu *Ppu) WriteToCtrl(val uint8) {
 	ppu.ControlRegister.Update(val)
 	bitsAfter := uint8(ppu.ControlRegister)
 	if !hasBit(bitsBefore, 7) && hasBit(bitsAfter, 7) && ppu.Status.InVBlank() {
-		ppu.nmiOcurred = true
+		ppu.NmiOcurred = true
 	}
 	//if we were in vblank but control says we cannot generate an nmi, if we decide to set control to generate nmi while maintaining vblank status
 	//we should notify we are already in nmi
