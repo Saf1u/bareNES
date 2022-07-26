@@ -6,9 +6,7 @@ import (
 	"os"
 )
 
-//should be 0x0600??
-const programLocation = 0xc000
-const pcStart = 0xFFFC
+
 const STACK uint8 = 0xfd
 const (
 	ACCUMULATOR                 = "Accumulator"
@@ -651,7 +649,6 @@ func (c *Cpu) LSR(mode string) {
 
 }
 func (c *Cpu) SLO(mode string) {
-	//var data uint8=0
 	c.ASL(mode)
 	c.ORA(mode)
 }
