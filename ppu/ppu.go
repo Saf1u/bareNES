@@ -365,49 +365,45 @@ func (reg *PPU_STATUS_REGISTER) InVBlank() bool {
 	return hasBit(uint8(*reg), 7)
 }
 
+
+
 //sus
 func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
 	if addr >= 0x3000 && addr <= 0x3eff {
 		addr = addr & 0x2fff
 	}
-	index := addr - 0x2000
-	table := index / 0x400
-
 	mirror := ppu.Mirror
-
 	switch {
-	case mirror == common.HORIZONTAL && table == 3 || mirror == common.VERTICAL && table == 2 || mirror == common.VERTICAL && table == 3:
-		index = index - 0x800
-		// if addr >= 0x2000 && addr <= 0x2400 {
-		// 	return addr - 0x2000
-		// }
-		// if addr >= 0x2400 && addr <= 0x2800 {
-		// 	return addr - 0x2400
-		// }
+	case mirror == common.HORIZONTAL:
+		if addr >= 0x2000 && addr < 0x2400 {
+			return addr - 0x2000
+		}
+		if addr >= 0x2400 && addr < 0x2800 {
+			return addr - 0x2400
+		}
 
-		// if addr >= 0x2800 && addr <= 0x2c00 {
-		// 	return (addr - 0x2800) + 0x400
-		// }
-		// if addr >= 0x2c00 && addr <= 0x3f00 {
-		// 	return (addr - 0x2c00) + 0x400
-		//}
-	case mirror == common.HORIZONTAL && table == 2 || mirror == common.HORIZONTAL && table == 1:
-		index = index - 0x400
-		// if addr >= 0x2000 && addr <= 0x2400 {
-		// 	return addr - 0x2000
-		// }
-		// if addr >= 0x2400 && addr <= 0x2800 {
-		// 	return addr - 0x2400 + 400
-		// }
+		if addr >= 0x2800 && addr < 0x2c00 {
+			return (addr - 0x2800) + 0x400
+		}
+		if addr >= 0x2c00 && addr < 0x3f00 {
+			return (addr - 0x2c00) + 0x400
+		}
+	case mirror == common.VERTICAL:
+		if addr >= 0x2000 && addr < 0x2400 {
+			return addr - 0x2000
+		}
+		if addr >= 0x2400 && addr < 0x2800 {
+			return addr - 0x2400 + 0x400
+		}
 
-		// if addr >= 0x2800 && addr <= 0x2c00 {
-		// 	return (addr - 0x2800)
-		// }
-		// if addr >= 0x2c00 && addr <= 0x3f00 {
-		// 	return (addr - 0x2c00) + 0x400
-		// }
+		if addr >= 0x2800 && addr < 0x2c00 {
+			return (addr - 0x2800)
+		}
+		if addr >= 0x2c00 && addr < 0x3f00 {
+			return (addr - 0x2c00) + 0x400
+		}
 	}
-	return index
+	return 0
 }
 
 func (ppu *Ppu) ReadData() uint8 {

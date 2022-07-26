@@ -3,11 +3,7 @@ package cpu
 import (
 	"emulator/ppu"
 	"emulator/rom"
-	"fmt"
-	"log"
 	"os"
-
-	"github.com/veandco/go-sdl2/sdl"
 )
 
 //should be 0x0600??
@@ -70,6 +66,7 @@ type Bus struct {
 	rom      *rom.Rom
 	Ppu      *ppu.Ppu
 	cpuTicks int
+	Event    chan int
 }
 
 func (b *Bus) tick(amount int) {
@@ -79,67 +76,14 @@ func (b *Bus) tick(amount int) {
 
 	if res {
 		b.Ppu.ShowTiles()
-		check := false
-		if b.Ppu.Ram[0] == 32 {
-			check = true
-			fmt.Println("lol")
-			// b.Ppu.SdlAccess(b.Ppu.Frame.Screen[:])
+		select {
+		case b.Event <- 0:
+		default:
 		}
-		sdlI(b.Ppu.Frame.Screen[:], check)
 
 	}
 }
 
-func sdlI(frame []uint8, check bool) {
-	err := sdl.InitSubSystem(sdl.INIT_VIDEO)
-	defer sdl.Quit()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	window, err := sdl.CreateWindow("sdl window", sdl.WINDOWPOS_UNDEFINED, sdl.WINDOWPOS_UNDEFINED, 256*3, 240*3, sdl.WINDOW_SHOWN)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	renderer, err := sdl.CreateRenderer(window, -1, sdl.RENDERER_PRESENTVSYNC)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	err = renderer.SetScale(3, 3)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	texture, err := renderer.CreateTexture(sdl.PIXELFORMAT_RGB24, sdl.TEXTUREACCESS_STATIC, 256, 240)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	err = texture.Update(nil, frame, 256*3)
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = renderer.Copy(texture, nil, nil)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(0)
-	}
-	renderer.Present()
-	sdl.PumpEvents()
-	for check {
-		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
-			case *sdl.QuitEvent:
-				return
-
-			}
-
-		}
-	}
-}
 func (b *Bus) WriteSingleByte(addr uint16, data uint8) {
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
@@ -260,22 +204,20 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	return dataLocation
 }
 
-func (c *Cpu) set() {
-
-	c.xRegister = 0
-	c.aRegister = 0
-	c.yRegister = 0
-	c.statusRegister = 0x24
-	c.stackPtr = STACK
-	c.pc = c.CpuBus.ReadDoubleByte(0xfffc)
-}
-func (c *Cpu) LoadToMem(rom *rom.Rom) {
+func (c *Cpu) Init(rom *rom.Rom, event chan int) {
 
 	c.CpuBus = Bus{}
 	c.CpuBus.cpuTicks = 0
 	c.CpuBus.rom = rom
 	c.CpuBus.Ppu = ppu.NewPPU(rom.CharRom, rom.MirorType)
 	c.CpuBus.Ppu.PpuTicks = c.CpuBus.cpuTicks * 3
+	c.CpuBus.Event = event
+	c.xRegister = 0
+	c.aRegister = 0
+	c.yRegister = 0
+	c.statusRegister = 0x24
+	c.stackPtr = STACK
+	c.pc = c.CpuBus.ReadDoubleByte(0xfffc)
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
@@ -1220,7 +1162,6 @@ func (c *Cpu) Run() {
 	if err != nil {
 		return
 	}
-	c.set()
 	for {
 
 		if c.CpuBus.Ppu.PollNmi() {
