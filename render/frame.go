@@ -10,7 +10,7 @@ type Frame struct {
 	//essentially a flattened rep of a 3 dimensional image x,y and 3 values for rgb
 }
 
-func (f *Frame) SetPixel(x int, y int, rgb [3]uint8) {
+func (f *Frame) SetPixel(x int, y int, rgb []uint8) {
 	base := y*WIDTH*3 + x*3
 	if base+2 < len(f.Screen) {
 		f.Screen[base] = rgb[0]

@@ -14,6 +14,10 @@ const (
 	SPRITE_SIZE
 	PPU_MASTER
 	GENERATE_NMI
+	TOP_LEFT
+	TOP_RIGHT
+	BOTTOM_LEFT
+	BOTTOM_RIGHT
 	CHR_ROM_START = 0
 	CHR_ROM_END   = 0x1FFF
 	PPU_RAM_START = 0x2000
@@ -21,6 +25,22 @@ const (
 	PALETTE_START = 0x3F00
 	PALETTE_END   = 0x3FFF
 )
+
+var pallete = [][]uint8{
+	{0x80, 0x80, 0x80}, {0x00, 0x3D, 0xA6}, {0x00, 0x12, 0xB0}, {0x44, 0x00, 0x96}, {0xA1, 0x00, 0x5E},
+	{0xC7, 0x00, 0x28}, {0xBA, 0x06, 0x00}, {0x8C, 0x17, 0x00}, {0x5C, 0x2F, 0x00}, {0x10, 0x45, 0x00},
+	{0x05, 0x4A, 0x00}, {0x00, 0x47, 0x2E}, {0x00, 0x41, 0x66}, {0x00, 0x00, 0x00}, {0x05, 0x05, 0x05},
+	{0x05, 0x05, 0x05}, {0xC7, 0xC7, 0xC7}, {0x00, 0x77, 0xFF}, {0x21, 0x55, 0xFF}, {0x82, 0x37, 0xFA},
+	{0xEB, 0x2F, 0xB5}, {0xFF, 0x29, 0x50}, {0xFF, 0x22, 0x00}, {0xD6, 0x32, 0x00}, {0xC4, 0x62, 0x00},
+	{0x35, 0x80, 0x00}, {0x05, 0x8F, 0x00}, {0x00, 0x8A, 0x55}, {0x00, 0x99, 0xCC}, {0x21, 0x21, 0x21},
+	{0x09, 0x09, 0x09}, {0x09, 0x09, 0x09}, {0xFF, 0xFF, 0xFF}, {0x0F, 0xD7, 0xFF}, {0x69, 0xA2, 0xFF},
+	{0xD4, 0x80, 0xFF}, {0xFF, 0x45, 0xF3}, {0xFF, 0x61, 0x8B}, {0xFF, 0x88, 0x33}, {0xFF, 0x9C, 0x12},
+	{0xFA, 0xBC, 0x20}, {0x9F, 0xE3, 0x0E}, {0x2B, 0xF0, 0x35}, {0x0C, 0xF0, 0xA4}, {0x05, 0xFB, 0xFF},
+	{0x5E, 0x5E, 0x5E}, {0x0D, 0x0D, 0x0D}, {0x0D, 0x0D, 0x0D}, {0xFF, 0xFF, 0xFF}, {0xA6, 0xFC, 0xFF},
+	{0xB3, 0xEC, 0xFF}, {0xDA, 0xAB, 0xEB}, {0xFF, 0xA8, 0xF9}, {0xFF, 0xAB, 0xB3}, {0xFF, 0xD2, 0xB0},
+	{0xFF, 0xEF, 0xA6}, {0xFF, 0xF7, 0x9C}, {0xD7, 0xE8, 0x95}, {0xA6, 0xED, 0xAF}, {0xA2, 0xF2, 0xDA},
+	{0x99, 0xFF, 0xFC}, {0xDD, 0xDD, 0xDD}, {0x11, 0x11, 0x11}, {0x11, 0x11, 0x11},
+}
 
 type Ppu struct {
 	ChrRom []uint8
@@ -49,12 +69,14 @@ type Ppu struct {
 	Frame     render.Frame
 }
 
-func (ppu *Ppu) ShowTiles() {
+func screenToAttribute(width int, height int) int {
+	//4x4 tiles of screen need to be chunked together
+	//we have 32 tiles in the wifth axis making it chunkable 8 times
+	height = (height / 4) * 8
+	return height + width/4
+}
 
-	col0 := [3]uint8{0x00, 0x3d, 0xa6}
-	col1 := [3]uint8{0xd6, 0x32, 0x00}
-	col2 := [3]uint8{0x00, 0x8a, 0x55}
-	col3 := [3]uint8{0x09, 0x09, 0x09}
+func (ppu *Ppu) ShowTiles() {
 
 	//4kb banks hence the multiplication
 
@@ -68,6 +90,25 @@ func (ppu *Ppu) ShowTiles() {
 	for i := 0; i <= 0x3c0; i++ {
 		tileNum := uint16(ppu.Ram[i])
 		tile := ppu.ChrRom[((bank * 0x1000) + tileNum*16) : (bank*0x1000)+tileNum*16+16]
+		attributeIndex := (ppu.Ram[i+screenToAttribute(width, height)])
+		colorIndex := ppu.Ram[0x3c0+uint16(attributeIndex)]
+		rowOrientation := ((colorIndex * 4) % 32) + 1
+		colOrientation := ((colorIndex * 4 * 4) / 32) + 1
+		color := uint8(0)
+		switch {
+		case width <= int(rowOrientation) && height <= int(colOrientation):
+			color = colorIndex & 0b00000011
+		case width > int(rowOrientation) && height <= int(colOrientation):
+			color = (colorIndex >> 2) & 0b00000011
+		case width <= int(rowOrientation) && height > int(colOrientation):
+			color = (colorIndex >> 4) & 0b00000011
+		case width > int(rowOrientation) && height > int(colOrientation):
+			color = (colorIndex >> 6) & 0b00000011
+		default:
+			panic("error!")
+		}
+		color = 1 + (color * 4)
+		colors := []uint8{ppu.Palette[0], ppu.Palette[color], ppu.Palette[color+1], ppu.Palette[color+2]}
 		for y := 0; y < 8; y++ {
 			upper := tile[y]
 			lower := tile[y+8]
@@ -75,26 +116,20 @@ func (ppu *Ppu) ShowTiles() {
 				col := upper&1<<1 | lower&1
 				upper = upper >> 1
 				lower = lower >> 1
+				screenRow := (int(width * 8)) + x
+				screenCol := (int(height * 8)) + y
 				switch col {
 				case 0:
-					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col0)
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[0]])
 				case 1:
-					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col1)
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[1]])
 				case 2:
-					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col2)
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[2]])
 				case 3:
-					ppu.Frame.SetPixel((int(width*8))+x, (int(height*8))+y, col3)
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[3]])
 				}
 			}
 		}
-		// tileNum++
-		// if tileNum == 256 {
-		// 	tileNum = 0
-		// 	bank++
-		// }
-		// if bank == 2 {
-		// 	break
-		// }
 		width++
 		if width == 32 {
 			height++
@@ -165,12 +200,10 @@ func (ppu *Ppu) ReadDataOamRegister() uint8 {
 }
 
 //sus
-func (ppu *Ppu) WriteOamDMA(addr uint8) {
-	charRomaddr := uint16(0x100) * uint16(addr)
-
-	for i := 0; i < 256; i++ {
-		ppu.Oam[i] = ppu.ChrRom[charRomaddr]
-		charRomaddr++
+func (ppu *Ppu) WriteOamDMA(data []uint8) {
+	for i := 0; i < len(data); i++ {
+		ppu.Oam[i] = data[i]
+		i++
 	}
 }
 
@@ -364,8 +397,6 @@ func (reg *PPU_STATUS_REGISTER) ClearSpriteOverflow() {
 func (reg *PPU_STATUS_REGISTER) InVBlank() bool {
 	return hasBit(uint8(*reg), 7)
 }
-
-
 
 //sus
 func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {

@@ -6,7 +6,6 @@ import (
 	"os"
 )
 
-
 const STACK uint8 = 0xfd
 const (
 	ACCUMULATOR                 = "Accumulator"
@@ -99,6 +98,14 @@ func (b *Bus) WriteSingleByte(addr uint16, data uint8) {
 		b.Ppu.Scroll.Update(data)
 	case addr == PPU_OAM_DATA:
 		b.Ppu.WriteDataOam(data)
+	case addr == PPU_OAM_DMA:
+		start := uint16(data) << 8
+		end := uint16(data)<<8 | 0x00FF
+		oamData := []uint8{}
+		for i := start; i < end; i++ {
+			oamData = append(oamData, b.ReadSingleByte(i))
+		}
+		b.Ppu.WriteOamDMA(oamData)
 	case addr == PPU_CONTROL_REGISTER:
 		b.Ppu.WriteToCtrl(data)
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
