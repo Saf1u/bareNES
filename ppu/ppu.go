@@ -3,6 +3,7 @@ package ppu
 import (
 	"emulator/common"
 	"emulator/render"
+	"emulator/utils"
 )
 
 const (
@@ -286,32 +287,32 @@ func (ctrl *PPU_MASK) Update(val uint8) {
 }
 
 func (ctrl *PPU_MASK) BackgroundRender() bool {
-	return hasBit(uint8(*ctrl), 3)
+	return utils.HasBit(uint8(*ctrl), 3)
 }
 func (ctrl *PPU_MASK) SpriteRender() bool {
-	return hasBit(uint8(*ctrl), 4)
+	return utils.HasBit(uint8(*ctrl), 4)
 }
 
 func (ctrl *PPU_MASK) BackgroundRenderTop() bool {
-	return hasBit(uint8(*ctrl), 1)
+	return utils.HasBit(uint8(*ctrl), 1)
 }
 func (ctrl *PPU_MASK) SpriteRenderTop() bool {
-	return hasBit(uint8(*ctrl), 2)
+	return utils.HasBit(uint8(*ctrl), 2)
 }
 
 func (ctrl *PPU_MASK) IsGreyScale() bool {
-	return hasBit(uint8(*ctrl), 0)
+	return utils.HasBit(uint8(*ctrl), 0)
 }
 
 func (ctrl *PPU_MASK) EmphasizeRed() bool {
-	return hasBit(uint8(*ctrl), 5)
+	return utils.HasBit(uint8(*ctrl), 5)
 }
 func (ctrl *PPU_MASK) EmphasizeGreen() bool {
-	return hasBit(uint8(*ctrl), 6)
+	return utils.HasBit(uint8(*ctrl), 6)
 }
 
 func (ctrl *PPU_MASK) EmphasizeBlue() bool {
-	return hasBit(uint8(*ctrl), 7)
+	return utils.HasBit(uint8(*ctrl), 7)
 }
 
 func (ctrl *PPU_MASK) EnableRendring() bool {
@@ -358,7 +359,7 @@ func (reg *addrReg) Increment(val uint8) {
 type PPU_CONTROL uint8
 
 func (ctrl *PPU_CONTROL) ValueToIncrementBy() uint8 {
-	if hasBit(uint8(*ctrl), VRAM_INCREMENT) {
+	if utils.HasBit(uint8(*ctrl), VRAM_INCREMENT) {
 		return 32
 	} else {
 		return 1
@@ -369,8 +370,8 @@ func (ctrl *PPU_CONTROL) Update(val uint8) {
 	*ctrl = PPU_CONTROL(val)
 }
 func (ctrl *PPU_CONTROL) GetBaseNameTableAddress() uint16 {
-	a := getBit(uint8(*ctrl), 0)
-	b := getBit(uint8(*ctrl), 1)
+	a := utils.GetBit(uint8(*ctrl), 0)
+	b := utils.GetBit(uint8(*ctrl), 1)
 
 	switch {
 	case a == 0 && b == 0:
@@ -386,7 +387,7 @@ func (ctrl *PPU_CONTROL) GetBaseNameTableAddress() uint16 {
 	}
 }
 func (ctrl *PPU_CONTROL) GetSpriteTableAddress() uint16 {
-	a := getBit(uint8(*ctrl), 3)
+	a := utils.GetBit(uint8(*ctrl), 3)
 
 	switch {
 	case a == 0:
@@ -399,7 +400,7 @@ func (ctrl *PPU_CONTROL) GetSpriteTableAddress() uint16 {
 
 }
 func (ctrl *PPU_CONTROL) GetBackgroundTableAddress() uint16 {
-	a := getBit(uint8(*ctrl), 4)
+	a := utils.GetBit(uint8(*ctrl), 4)
 
 	switch {
 	case a == 0:
@@ -412,7 +413,7 @@ func (ctrl *PPU_CONTROL) GetBackgroundTableAddress() uint16 {
 
 }
 func (ctrl *PPU_CONTROL) GetSpritesize() uint8 {
-	a := getBit(uint8(*ctrl), 5)
+	a := utils.GetBit(uint8(*ctrl), 5)
 
 	switch {
 	case a == 0:
@@ -426,10 +427,10 @@ func (ctrl *PPU_CONTROL) GetSpritesize() uint8 {
 }
 
 func (ctrl *PPU_CONTROL) GetMasterSlave() uint8 {
-	return getBit(uint8(*ctrl), 6)
+	return utils.GetBit(uint8(*ctrl), 6)
 }
 func (ctrl *PPU_CONTROL) GenerateNmi() bool {
-	return hasBit(uint8(*ctrl), 7)
+	return utils.HasBit(uint8(*ctrl), 7)
 }
 
 type PPU_SCROLL_REGISTER struct {
@@ -446,29 +447,28 @@ func (reg *PPU_SCROLL_REGISTER) Update(value uint8) {
 type PPU_STATUS_REGISTER uint8
 
 func (reg *PPU_STATUS_REGISTER) SetVBlank() {
-	*reg = PPU_STATUS_REGISTER(setBit(uint8(*reg), 7))
+	*reg = PPU_STATUS_REGISTER(utils.SetBit(uint8(*reg), 7))
 }
 func (reg *PPU_STATUS_REGISTER) ClearVBlank() {
-	*reg = PPU_STATUS_REGISTER(clearBit(uint8(*reg), 7))
+	*reg = PPU_STATUS_REGISTER(utils.ClearBit(uint8(*reg), 7))
 }
 
 func (reg *PPU_STATUS_REGISTER) SetSpriteZero() {
-	*reg = PPU_STATUS_REGISTER(setBit(uint8(*reg), 6))
+	*reg = PPU_STATUS_REGISTER(utils.SetBit(uint8(*reg), 6))
 }
 func (reg *PPU_STATUS_REGISTER) ClearSpriteZero() {
-	*reg = PPU_STATUS_REGISTER(clearBit(uint8(*reg), 6))
+	*reg = PPU_STATUS_REGISTER(utils.ClearBit(uint8(*reg), 6))
 }
 
 func (reg *PPU_STATUS_REGISTER) SetSpriteOverflow() {
-	*reg = PPU_STATUS_REGISTER(setBit(uint8(*reg), 5))
+	*reg = PPU_STATUS_REGISTER(utils.SetBit(uint8(*reg), 5))
 }
 func (reg *PPU_STATUS_REGISTER) ClearSpriteOverflow() {
-	*reg = PPU_STATUS_REGISTER(clearBit(uint8(*reg), 5))
+	*reg = PPU_STATUS_REGISTER(utils.ClearBit(uint8(*reg), 5))
 }
 func (reg *PPU_STATUS_REGISTER) InVBlank() bool {
-	return hasBit(uint8(*reg), 7)
+	return utils.HasBit(uint8(*reg), 7)
 }
-
 
 func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
 	if addr >= 0x3000 && addr <= 0x3eff {
@@ -559,7 +559,7 @@ func (ppu *Ppu) WriteToCtrl(val uint8) {
 	bitsBefore := uint8(ppu.ControlRegister)
 	ppu.ControlRegister.Update(val)
 	bitsAfter := uint8(ppu.ControlRegister)
-	if !hasBit(bitsBefore, 7) && hasBit(bitsAfter, 7) && ppu.Status.InVBlank() {
+	if !utils.HasBit(bitsBefore, 7) && utils.HasBit(bitsAfter, 7) && ppu.Status.InVBlank() {
 		ppu.NmiOcurred = true
 	}
 	//if we were in vblank but control says we cannot generate an nmi, if we decide to set control to generate nmi while maintaining vblank status
@@ -571,30 +571,4 @@ func (ppu *Ppu) ReadStatus() uint8 {
 	ppu.Scroll.ptr = 0
 	ppu.AddrRegister.ptr = 0
 	return temp
-}
-
-//this is a duplicate remove later
-func hasBit(n uint8, pos int) bool {
-	val := n & (1 << pos)
-	return (val > 0)
-}
-
-func setBit(num uint8, pos int) uint8 {
-
-	num |= (uint8(1) << pos)
-	return num
-}
-
-func clearBit(n uint8, pos int) uint8 {
-	var mask uint8 = ^(1 << pos)
-	n &= mask
-	return n
-}
-
-func getBit(n uint8, pos int) uint8 {
-	val := n & (1 << pos)
-	if val > 0 {
-		return 1
-	}
-	return 0
 }
