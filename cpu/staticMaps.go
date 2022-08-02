@@ -180,6 +180,22 @@ var instructionInfo = map[uint8][]string{
 	0x9c: {"*SHY", "3", ABSOLUTE_X, "5"},
 }
 
+func getAddrMode(opcode uint8) string {
+	return instructionInfo[opcode][2]
+}
+func getNumber(opcode uint8) int {
+	number := instructionInfo[opcode][1]
+	num, err := strconv.Atoi(number)
+	if err != nil {
+		return -1
+	}
+	return num
+}
+
+func getCycle(opcode uint8) string {
+	return instructionInfo[opcode][3]
+}
+
 func (c *Cpu) getTicks(mode string) int {
 	tick := 0
 	dataLocation := c.pc + 1

@@ -1,6 +1,7 @@
 package cpu
 
 import (
+	"emulator/utils"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -157,8 +158,8 @@ func TestLDX(t *testing.T) {
 			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDX(IMMEDIATE)
 			assert.Equal(t, cpu.xRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -180,8 +181,8 @@ func TestLDA(t *testing.T) {
 			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDA(IMMEDIATE)
 			assert.Equal(t, cpu.aRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -204,8 +205,8 @@ func TestLDY(t *testing.T) {
 			cpu.CpuBus.cpuRam[1] = tt.data
 			cpu.LDY(IMMEDIATE)
 			assert.Equal(t, cpu.yRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -256,8 +257,8 @@ func TestTAX(t *testing.T) {
 			cpu.aRegister = tt.data
 			cpu.TAX()
 			assert.Equal(t, cpu.xRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -280,8 +281,8 @@ func TestTAY(t *testing.T) {
 			cpu.aRegister = tt.data
 			cpu.TAY()
 			assert.Equal(t, cpu.yRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -304,8 +305,8 @@ func TestTXA(t *testing.T) {
 			cpu.xRegister = tt.data
 			cpu.TXA()
 			assert.Equal(t, cpu.aRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -328,8 +329,8 @@ func TestTYA(t *testing.T) {
 			cpu.yRegister = tt.data
 			cpu.TYA()
 			assert.Equal(t, cpu.aRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }
@@ -352,8 +353,8 @@ func TestTSX(t *testing.T) {
 			cpu.stackPtr = tt.data
 			cpu.TSX()
 			assert.Equal(t, cpu.xRegister, tt.data)
-			assert.Equal(t, hasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
-			assert.Equal(t, hasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, ZERO_FLAG), tt.isZero)
+			assert.Equal(t, utils.HasBit(cpu.statusRegister, NEGATIVE_FLAG), tt.bitSevenOne)
 		})
 	}
 }

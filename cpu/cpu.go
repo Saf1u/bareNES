@@ -3,6 +3,7 @@ package cpu
 import (
 	"emulator/ppu"
 	"emulator/rom"
+	"emulator/utils"
 )
 
 const STACK uint8 = 0xfd
@@ -90,7 +91,7 @@ func (b *Bus) tick(amount int) {
 func (b *Bus) WriteSingleByte(addr uint16, data uint8) {
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
-		addr = mirror(addr)
+		addr = utils.Mirror(addr)
 		b.cpuRam[addr] = data
 	case addr == PPU_DATA_REGISTER:
 		b.Ppu.WriteData(data)
@@ -152,10 +153,10 @@ func (pad *JoyPad) read() uint8 {
 }
 func (pad *JoyPad) Set(val bool, pos int) {
 	if val {
-		pad.buttons = setBit(pad.buttons, pos)
+		pad.buttons = utils.SetBit(pad.buttons, pos)
 		return
 	}
-	pad.buttons = clearBit(pad.buttons, pos)
+	pad.buttons = utils.ClearBit(pad.buttons, pos)
 }
 
 func (b *Bus) WriteDoubleByte(addr uint16, data uint16) {
@@ -170,7 +171,7 @@ func (b *Bus) ReadSingleByte(addr uint16) uint8 {
 	var data uint8 = 0
 	switch {
 	case addr >= CPU_RAM_START && addr <= CPU_RAM_END:
-		addr = mirror(addr)
+		addr = utils.Mirror(addr)
 		data = b.cpuRam[addr]
 	case addr >= PROG_ROM_START && addr <= PROG_ROM_END:
 		data = b.rom.ReadRom(addr)
@@ -273,51 +274,51 @@ func (c *Cpu) Init(rom *rom.Rom, event chan int, done chan int) {
 	c.pc = c.CpuBus.ReadDoubleByte(0xfffc)
 }
 func (c *Cpu) SEC() {
-	c.statusRegister = (setBit(c.statusRegister, CARRY_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, CARRY_FLAG))
 
 }
 func (c *Cpu) CLC() {
-	c.statusRegister = (clearBit(c.statusRegister, CARRY_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, CARRY_FLAG))
 }
 func (c *Cpu) GetBit(pos int) uint8 {
-	return getBit(c.statusRegister, pos)
+	return utils.GetBit(c.statusRegister, pos)
 }
 func (c *Cpu) SetZero() {
 
-	c.statusRegister = (setBit(c.statusRegister, ZERO_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, ZERO_FLAG))
 }
 func (c *Cpu) ClearZero() {
-	c.statusRegister = (clearBit(c.statusRegister, ZERO_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, ZERO_FLAG))
 }
 func (c *Cpu) SEI() {
-	c.statusRegister = (setBit(c.statusRegister, INTERRUPT_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, INTERRUPT_FLAG))
 }
 func (c *Cpu) CLI() {
-	c.statusRegister = (clearBit(c.statusRegister, INTERRUPT_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, INTERRUPT_FLAG))
 }
 func (c *Cpu) SED() {
-	c.statusRegister = (setBit(c.statusRegister, DECIMAL_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, DECIMAL_FLAG))
 }
 func (c *Cpu) CLD() {
-	c.statusRegister = (clearBit(c.statusRegister, DECIMAL_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, DECIMAL_FLAG))
 }
 func (c *Cpu) SetBreak() {
-	c.statusRegister = (setBit(c.statusRegister, BREAK_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, BREAK_FLAG))
 }
 func (c *Cpu) ClearBreak() {
-	c.statusRegister = (clearBit(c.statusRegister, BREAK_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, BREAK_FLAG))
 }
 func (c *Cpu) SetOverflow() {
-	c.statusRegister = (setBit(c.statusRegister, OVERFLOW_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, OVERFLOW_FLAG))
 }
 func (c *Cpu) CLV() {
-	c.statusRegister = (clearBit(c.statusRegister, OVERFLOW_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, OVERFLOW_FLAG))
 }
 func (c *Cpu) SetNegative() {
-	c.statusRegister = (setBit(c.statusRegister, NEGATIVE_FLAG))
+	c.statusRegister = (utils.SetBit(c.statusRegister, NEGATIVE_FLAG))
 }
 func (c *Cpu) ClearNegative() {
-	c.statusRegister = (clearBit(c.statusRegister, NEGATIVE_FLAG))
+	c.statusRegister = (utils.ClearBit(c.statusRegister, NEGATIVE_FLAG))
 }
 
 func (c *Cpu) alterZeroAndNeg(data uint8) {
@@ -326,7 +327,7 @@ func (c *Cpu) alterZeroAndNeg(data uint8) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(data, 7) {
+	if utils.HasBit(data, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -363,13 +364,13 @@ func (c *Cpu) SBC(mode string) {
 
 	data = ^data
 
-	if hasBit(c.statusRegister, CARRY_FLAG) {
+	if utils.HasBit(c.statusRegister, CARRY_FLAG) {
 		data++
 	}
 	t := (c.aRegister) + (data)
 	temp := uint8(t)
 
-	if (!hasBit(c.aRegister, 7) && !hasBit(data, 7)) && (hasBit(temp, 7)) {
+	if (!utils.HasBit(c.aRegister, 7) && !utils.HasBit(data, 7)) && (utils.HasBit(temp, 7)) {
 		c.SetOverflow()
 		if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
 			c.SEC()
@@ -377,7 +378,7 @@ func (c *Cpu) SBC(mode string) {
 			c.CLC()
 		}
 	} else {
-		if (hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
+		if (utils.HasBit(c.aRegister, 7) && utils.HasBit(data, 7)) && (!utils.HasBit(temp, 7)) {
 
 			c.SetOverflow()
 			if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
@@ -390,7 +391,7 @@ func (c *Cpu) SBC(mode string) {
 
 			c.CLV()
 
-			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) || (hasBit(c.aRegister, 7) && !hasBit(data, 7)) {
+			if (!utils.HasBit(c.aRegister, 7) && utils.HasBit(data, 7)) || (utils.HasBit(c.aRegister, 7) && !utils.HasBit(data, 7)) {
 
 				if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
 					c.SEC()
@@ -410,7 +411,7 @@ func (c *Cpu) SBC(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(c.aRegister, 7) {
+	if utils.HasBit(c.aRegister, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -423,20 +424,20 @@ func (c *Cpu) ADC(mode string) {
 	data := c.CpuBus.ReadSingleByte(loc)
 
 	t := (c.aRegister) + (data)
-	if hasBit(c.statusRegister, CARRY_FLAG) {
+	if utils.HasBit(c.statusRegister, CARRY_FLAG) {
 		t++
 	}
 	c.CLC()
 	temp := uint8(t)
 
-	if (!hasBit(c.aRegister, 7) && !hasBit(data, 7)) && (hasBit(temp, 7)) {
+	if (!utils.HasBit(c.aRegister, 7) && !utils.HasBit(data, 7)) && (utils.HasBit(temp, 7)) {
 		c.SetOverflow()
 	} else {
-		if (hasBit(c.aRegister, 7) && hasBit(data, 7)) && (!hasBit(temp, 7)) {
+		if (utils.HasBit(c.aRegister, 7) && utils.HasBit(data, 7)) && (!utils.HasBit(temp, 7)) {
 			c.SetOverflow()
 		} else {
 			c.CLV()
-			if (!hasBit(c.aRegister, 7) && hasBit(data, 7)) || (hasBit(c.aRegister, 7) && !hasBit(data, 7)) {
+			if (!utils.HasBit(c.aRegister, 7) && utils.HasBit(data, 7)) || (utils.HasBit(c.aRegister, 7) && !utils.HasBit(data, 7)) {
 				if (uint16(c.aRegister) + uint16(data)) != uint16(temp) {
 					c.SEC()
 				} else {
@@ -452,7 +453,8 @@ func (c *Cpu) ADC(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(c.aRegister, 7) {
+	if utils.HasBit(c.aRegister, 7) {
+
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -602,7 +604,7 @@ func (c *Cpu) CMP(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(temp, 7) {
+	if utils.HasBit(temp, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -624,7 +626,7 @@ func (c *Cpu) CPX(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(temp, 7) {
+	if utils.HasBit(temp, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -645,7 +647,7 @@ func (c *Cpu) CPY(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(temp, 7) {
+	if utils.HasBit(temp, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -662,12 +664,12 @@ func (c *Cpu) BIT(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(data, 6) {
+	if utils.HasBit(data, 6) {
 		c.SetOverflow()
 	} else {
 		c.CLV()
 	}
-	if hasBit(data, 7) {
+	if utils.HasBit(data, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
@@ -684,7 +686,7 @@ func (c *Cpu) LSR(mode string) {
 		loc = c.addrMode(mode)
 		data = c.CpuBus.ReadSingleByte(loc)
 	}
-	if hasBit(data, 0) {
+	if utils.HasBit(data, 0) {
 		c.SEC()
 	} else {
 		c.CLC()
@@ -717,7 +719,7 @@ func (c *Cpu) ASL(mode string) {
 		loc = c.addrMode(mode)
 		data = c.CpuBus.ReadSingleByte(loc)
 	}
-	if hasBit(data, 7) {
+	if utils.HasBit(data, 7) {
 		c.SEC()
 	} else {
 		c.CLC()
@@ -743,12 +745,12 @@ func (c *Cpu) ROL(mode string) {
 	}
 
 	temp := c.GetBit(CARRY_FLAG)
-	templast := getBit(data, 7)
+	templast := utils.GetBit(data, 7)
 	data = data << 1
 	if temp > 0 {
-		data = setBit(data, 0)
+		data = utils.SetBit(data, 0)
 	} else {
-		data = clearBit(data, 0)
+		data = utils.ClearBit(data, 0)
 	}
 	if mode == ACCUMULATOR {
 		c.aRegister = data
@@ -766,7 +768,7 @@ func (c *Cpu) ROL(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	templast = getBit(data, 7)
+	templast = utils.GetBit(data, 7)
 
 	if templast > 0 {
 		c.SetNegative()
@@ -800,19 +802,19 @@ func (c *Cpu) ARR(mode string) {
 	c.aRegister = data & c.aRegister
 	c.ROR(ACCUMULATOR)
 	temp := c.Acc()
-	if hasBit(temp, 5) && hasBit(temp, 6) {
+	if utils.HasBit(temp, 5) && utils.HasBit(temp, 6) {
 		c.SEC()
 		c.CLV()
 	}
-	if !hasBit(temp, 5) && !hasBit(temp, 6) {
+	if !utils.HasBit(temp, 5) && !utils.HasBit(temp, 6) {
 		c.CLC()
 		c.CLV()
 	}
-	if hasBit(temp, 5) && !hasBit(temp, 6) {
+	if utils.HasBit(temp, 5) && !utils.HasBit(temp, 6) {
 		c.CLC()
 		c.SetOverflow()
 	}
-	if !hasBit(temp, 5) && hasBit(temp, 6) {
+	if !utils.HasBit(temp, 5) && utils.HasBit(temp, 6) {
 		c.SetOverflow()
 		c.SEC()
 	}
@@ -831,12 +833,12 @@ func (c *Cpu) ROR(mode string) {
 		data = c.CpuBus.ReadSingleByte(loc)
 	}
 	temp := c.GetBit(CARRY_FLAG)
-	templast := getBit(data, 0)
+	templast := utils.GetBit(data, 0)
 	data = data >> 1
 	if temp > 0 {
-		data = setBit(data, 7)
+		data = utils.SetBit(data, 7)
 	} else {
-		data = clearBit(data, 7)
+		data = utils.ClearBit(data, 7)
 	}
 	if mode == ACCUMULATOR {
 		c.aRegister = data
@@ -887,7 +889,7 @@ func (c *Cpu) JMP(mode string) {
 
 func (c *Cpu) BMI(tick int) {
 	toJump := c.addrMode(RELATIVE)
-	if hasBit(c.statusRegister, 7) {
+	if utils.HasBit(c.statusRegister, 7) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -903,7 +905,7 @@ func (c *Cpu) BMI(tick int) {
 }
 func (c *Cpu) BPL(tick int) {
 	toJump := c.addrMode(RELATIVE)
-	if !hasBit(c.statusRegister, 7) {
+	if !utils.HasBit(c.statusRegister, 7) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -922,7 +924,7 @@ func (c *Cpu) BVS(tick int) {
 
 	toJump := c.addrMode(RELATIVE)
 
-	if hasBit(c.statusRegister, 6) {
+	if utils.HasBit(c.statusRegister, 6) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -941,7 +943,7 @@ func (c *Cpu) BVC(tick int) {
 
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := c.addrMode(RELATIVE)
-	if !hasBit(c.statusRegister, 6) {
+	if !utils.HasBit(c.statusRegister, 6) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + (toJump)
@@ -957,7 +959,7 @@ func (c *Cpu) BVC(tick int) {
 }
 func (c *Cpu) BCC(tick int) {
 	toJump := c.addrMode(RELATIVE)
-	if !hasBit(c.statusRegister, 0) {
+	if !utils.HasBit(c.statusRegister, 0) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -975,7 +977,7 @@ func (c *Cpu) BCC(tick int) {
 func (c *Cpu) BEQ(tick int) {
 
 	toJump := c.addrMode(RELATIVE)
-	if hasBit(c.statusRegister, 1) {
+	if utils.HasBit(c.statusRegister, 1) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -991,7 +993,7 @@ func (c *Cpu) BEQ(tick int) {
 }
 func (c *Cpu) BCS(tick int) {
 	toJump := c.addrMode(RELATIVE)
-	if hasBit(c.statusRegister, 0) {
+	if utils.HasBit(c.statusRegister, 0) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -1007,7 +1009,7 @@ func (c *Cpu) BCS(tick int) {
 }
 func (c *Cpu) BNE(tick int) {
 	toJump := c.addrMode(RELATIVE)
-	if !hasBit(c.statusRegister, 1) {
+	if !utils.HasBit(c.statusRegister, 1) {
 		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
@@ -1024,7 +1026,7 @@ func (c *Cpu) BNE(tick int) {
 func (c *Cpu) ANC(mode string) {
 
 	c.AND(mode)
-	if hasBit(c.aRegister, NEGATIVE_FLAG) {
+	if utils.HasBit(c.aRegister, NEGATIVE_FLAG) {
 		c.SEC()
 	} else {
 		c.CLC()
@@ -1127,8 +1129,8 @@ func (c *Cpu) PHA() {
 }
 func (c *Cpu) PHP() {
 	reg := c.statusRegister
-	reg = setBit(reg, BREAK_FLAG)
-	reg = setBit(reg, 5)
+	reg = utils.SetBit(reg, BREAK_FLAG)
+	reg = utils.SetBit(reg, 5)
 	c.Push(reg)
 }
 func (c *Cpu) PLA() {
@@ -1137,8 +1139,8 @@ func (c *Cpu) PLA() {
 	c.aRegister = acc
 }
 func (c *Cpu) ExecuteNMI() {
-	temp := setBit(c.statusRegister, 5)
-	temp = clearBit(temp, BREAK_FLAG)
+	temp := utils.SetBit(c.statusRegister, 5)
+	temp = utils.ClearBit(temp, BREAK_FLAG)
 	//hardware interrupt by ppu clear break??
 	c.PushDouble(c.pc)
 	c.Push(temp)
@@ -1152,7 +1154,7 @@ func (c *Cpu) RTI() {
 	c.statusRegister = c.Pop()
 	c.pc = c.PopDouble()
 	c.ClearBreak()
-	c.statusRegister = setBit(c.statusRegister, 5)
+	c.statusRegister = utils.SetBit(c.statusRegister, 5)
 }
 func (c *Cpu) BRK() {
 	c.Push(c.statusRegister)
@@ -1165,7 +1167,7 @@ func (c *Cpu) PLP() {
 	reg := c.Pop()
 	c.statusRegister = reg
 	c.ClearBreak()
-	c.statusRegister = setBit(c.statusRegister, 5)
+	c.statusRegister = utils.SetBit(c.statusRegister, 5)
 }
 
 func (c *Cpu) LDA(mode string) {
@@ -1177,7 +1179,7 @@ func (c *Cpu) LDA(mode string) {
 	} else {
 		c.ClearZero()
 	}
-	if hasBit(data, 7) {
+	if utils.HasBit(data, 7) {
 		c.SetNegative()
 	} else {
 		c.ClearNegative()
