@@ -1,5 +1,7 @@
 package cpu
 
+import "strconv"
+
 var instructionInfo = map[uint8][]string{
 	0x69: {"ADC", "2", IMMEDIATE, "2"}, 0x65: {"ADC", "2", ZERO_PAGE, "3"}, 0x75: {"ADC", "2", ZERO_PAGE_X, "4"}, 0x6D: {"ADC", "3", ABSOLUTE, "4"}, 0x7D: {"ADC", "3", ABSOLUTE_X, "4*"}, 0x79: {"ADC", "3", ABSOLUTE_Y, "4*"}, 0x61: {"ADC", "2", INDIRECT_X, "6"}, 0x71: {"ADC", "2", INDIRECT_Y, "5*"},
 	0x29: {"AND", "2", IMMEDIATE, "2"}, 0x25: {"AND", "2", ZERO_PAGE, "3"}, 0x35: {"AND", "2", ZERO_PAGE_X, "4"}, 0x2D: {"AND", "3", ABSOLUTE, "4"}, 0x3D: {"AND", "3", ABSOLUTE_X, "4*"}, 0x39: {"AND", "3", ABSOLUTE_Y, "4*"}, 0x21: {"AND", "2", INDIRECT_X, "6"}, 0x31: {"AND", "2", INDIRECT_Y, "5*"},
@@ -176,4 +178,95 @@ var instructionInfo = map[uint8][]string{
 
 	0x9E: {"*SHX", "3", ABSOLUTE_Y, "5"},
 	0x9c: {"*SHY", "3", ABSOLUTE_X, "5"},
+}
+
+func (c *Cpu) getTicks(mode string) int {
+	tick := 0
+	dataLocation := c.pc + 1
+	dataSingle := c.CpuBus.ReadSingleByte(dataLocation)
+	opcode := c.CpuBus.ReadSingleByte(c.pc)
+
+	switch mode {
+
+	case ZERO_PAGE, ABSOLUTE_INDIRECT, IMPLIED, ACCUMULATOR, IMMEDIATE, ABSOLUTE, ZERO_PAGE_X, ZERO_PAGE_Y, INDIRECT_X:
+		cycle := getCycle(opcode)
+		cycleInt := 0
+		if len(cycle) == 1 {
+			cycleInt, _ = strconv.Atoi(cycle[0:1])
+		}
+		tick = cycleInt
+
+	case RELATIVE:
+		toJump := dataSingle
+		page := c.pc + 2 + uint16(int8(toJump))
+		cycle := getCycle(opcode)
+		cycleInt := 0
+		if len(cycle) == 3 {
+			cycleInt, _ = strconv.Atoi(cycle[0:1])
+		}
+		pageEnd := uint16(0x00ff)
+
+		if page > c.pc+2|pageEnd || page < (c.pc+2)&(0xff00) {
+			cycleInt += 2
+		} else {
+			cycleInt++
+		}
+		tick = cycleInt
+
+	case ABSOLUTE_X:
+		data := c.CpuBus.ReadDoubleByte(c.pc + 1)
+		dataLocation = data + uint16(c.xRegister)
+		cycle := getCycle(opcode)
+		cycleInt := 0
+
+		cycleInt, _ = strconv.Atoi(cycle[0:1])
+		if len(cycle) == 2 {
+			pageEnd := uint16(0x00ff)
+
+			if dataLocation > data|pageEnd || data > dataLocation {
+
+				cycleInt++
+			}
+		}
+		tick = cycleInt
+	case ABSOLUTE_Y:
+		data := c.CpuBus.ReadDoubleByte(c.pc + 1)
+		dataLocation = data + uint16(c.yRegister)
+		cycle := getCycle(opcode)
+		cycleInt := 0
+		cycleInt, _ = strconv.Atoi(cycle[0:1])
+		if len(cycle) == 2 {
+			pageEnd := uint16(0x00ff)
+
+			if dataLocation > data|pageEnd || data > dataLocation {
+
+				cycleInt++
+			}
+		}
+		tick = cycleInt
+	case INDIRECT_Y:
+		pos := uint16(dataSingle)
+		low := c.CpuBus.ReadSingleByte(pos)
+		temp := uint8(dataSingle + 1)
+		hi := c.CpuBus.ReadSingleByte(uint16(temp))
+		loc := uint16(hi)<<8 | uint16(low)
+		dataLocation = loc + uint16(c.yRegister)
+		cycle := getCycle(opcode)
+		cycleInt := 0
+		cycleInt, _ = strconv.Atoi(cycle[0:1])
+		if len(cycle) == 2 {
+			pageEnd := uint16(0x00ff)
+
+			if dataLocation > loc|pageEnd || loc > dataLocation {
+
+				cycleInt++
+			}
+		}
+
+		tick = cycleInt
+	default:
+		panic("unknown mode")
+
+	}
+	return tick
 }

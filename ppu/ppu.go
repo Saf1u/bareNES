@@ -241,7 +241,6 @@ func NewPPU(rom []uint8, mirror int) *Ppu {
 		Mirror: mirror,
 		ChrRom: rom,
 	}
-	//	ppu.PpuTicks = 7 * 3
 
 	return ppu
 }
@@ -264,9 +263,7 @@ func (ppu *Ppu) ReadDataOamRegister() uint8 {
 	return ppu.Oam[ppu.OamAddr]
 }
 
-//sus
 func (ppu *Ppu) WriteOamDMA(data []uint8) {
-	//fmt.Println(data)
 	for i := 0; i < len(data); i++ {
 		ppu.Oam[ppu.OamAddr] = data[i]
 		ppu.OamAddr.Increment()
@@ -472,7 +469,7 @@ func (reg *PPU_STATUS_REGISTER) InVBlank() bool {
 	return hasBit(uint8(*reg), 7)
 }
 
-//sus
+
 func (ppu *Ppu) mirriorPPU(addr uint16) uint16 {
 	if addr >= 0x3000 && addr <= 0x3eff {
 		addr = addr & 0x2fff

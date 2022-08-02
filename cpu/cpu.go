@@ -3,7 +3,6 @@ package cpu
 import (
 	"emulator/ppu"
 	"emulator/rom"
-	"os"
 )
 
 const STACK uint8 = 0xfd
@@ -46,9 +45,8 @@ const (
 	PROG_ROM_END         uint16 = 0xffff
 	CTRL_ONE                    = 0x4016
 	CTRL_TWO                    = 0x4017
+	STACK_PAGE           uint16 = 0x0100
 )
-
-const STACK_PAGE uint16 = 0x0100
 
 //Cpu composes of a 6502 register set and addressable memory
 type Cpu struct {
@@ -83,12 +81,9 @@ func (b *Bus) tick(amount int) {
 	res := b.Ppu.Tick(3 * amount)
 
 	if res {
-
 		b.Ppu.ShowTiles()
-
 		b.Event <- 0
 		<-b.done
-
 	}
 }
 
@@ -1225,11 +1220,7 @@ func (c *Cpu) Pop() uint8 {
 }
 
 func (c *Cpu) Run() {
-	fl, err := os.OpenFile("tracer.log", os.O_RDWR, 0755)
-	defer fl.Close()
-	if err != nil {
-		return
-	}
+
 	for {
 		c.jumped = false
 
@@ -1237,13 +1228,9 @@ func (c *Cpu) Run() {
 			c.CpuBus.Ppu.NmiOcurred = false
 			c.ExecuteNMI()
 		}
-
-		//temp := c.pc
-
 		location := c.CpuBus.ReadSingleByte(c.pc)
-		//fmt.Printf("%x %x %x %x\n", location, c.CpuBus.ReadDoubleByte(c.pc+1), c.pc, c.statusRegister)
 		mode := getAddrMode(location)
-		tick := c.TraceExecution(mode, fl)
+		tick := c.getTicks(mode)
 
 		switch location {
 		case 0x00:

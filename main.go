@@ -12,7 +12,7 @@ import (
 
 func main() {
 
-	rom, err := rom.NewRom("cyo.nes")
+	rom, err := rom.NewRom("roms/nestest.nes")
 
 	if err != nil {
 		fmt.Println(err)
