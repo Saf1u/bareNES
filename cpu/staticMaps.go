@@ -85,6 +85,19 @@ var instructionInfo = map[uint8][]string{
 	0xDC: {"*NOP", "3", ABSOLUTE_X, "4*"},
 	0xFC: {"*NOP", "3", ABSOLUTE_X, "4*"},
 
+	0x02: {"*NOP", "1", IMPLIED, "2"},
+	0x12: {"*NOP", "1", IMPLIED, "2"},
+	0x22: {"*NOP", "1", IMPLIED, "2"},
+	0x32: {"*NOP", "1", IMPLIED, "2"},
+	0x42: {"*NOP", "1", IMPLIED, "2"},
+	0x52: {"*NOP", "1", IMPLIED, "2"},
+	0x62: {"*NOP", "1", IMPLIED, "2"},
+	0x72: {"*NOP", "1", IMPLIED, "2"},
+	0x92: {"*NOP", "1", IMPLIED, "2"},
+	0xB2: {"*NOP", "1", IMPLIED, "2"},
+	0xD2: {"*NOP", "1", IMPLIED, "2"},
+	0xF2: {"*NOP", "1", IMPLIED, "2"},
+
 	0xA7: {"*LAX", "2", ZERO_PAGE, "3"},
 	0xB7: {"*LAX", "2", ZERO_PAGE_Y, "4"},
 	0xAF: {"*LAX", "3", ABSOLUTE, "4"},
@@ -152,7 +165,7 @@ var instructionInfo = map[uint8][]string{
 	0xFf: {"*ISB", "3", ABSOLUTE_X, "7"},
 	0xFb: {"*ISB", "3", ABSOLUTE_Y, "7"},
 	0xE3: {"*ISB", "2", INDIRECT_X, "8"},
-	0xF3: {"*ISB", "2", INDIRECT_Y, "8"},//typo from https://www.masswerk.at/6502/6502_instruction_set.html#opcodes-footnote1??
+	0xF3: {"*ISB", "2", INDIRECT_Y, "8"}, //typo from https://www.masswerk.at/6502/6502_instruction_set.html#opcodes-footnote1??
 
 	0x8b: {"*XAA", "2", IMMEDIATE, "2"},
 	0xBb: {"*LAS", "3", ABSOLUTE_Y, "4*"},

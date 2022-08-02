@@ -1,6 +1,8 @@
 package cpu
 
-import "strconv"
+import (
+	"strconv"
+)
 
 func setBit(num uint8, pos int) uint8 {
 

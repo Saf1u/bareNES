@@ -12,22 +12,24 @@ import (
 
 func main() {
 
-	rom, err := rom.NewRom("nest.nes")
+	rom, err := rom.NewRom("cyo.nes")
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(0)
 	}
 	renderEvent := make(chan int)
+	done := make(chan int)
 	cpu := &cpu.Cpu{}
-	cpu.Init(rom, renderEvent)
+	cpu.Init(rom, renderEvent, done)
 	go func() {
 		cpu.Run()
 	}()
 
-	Screen(cpu.CpuBus.Ppu.Frame.Screen[:], renderEvent)
+	Screen(cpu.CpuBus.Ppu.Frame.Screen[:], renderEvent, done, &cpu.CpuBus.Pad)
 }
 
-func Screen(pixels []uint8, renderLisitiner chan int) {
+func Screen(pixels []uint8, renderLisitiner chan int, done chan int, pad *cpu.JoyPad) {
 	err := sdl.InitSubSystem(sdl.INIT_VIDEO)
 	defer sdl.Quit()
 	if err != nil {
@@ -71,15 +73,86 @@ func Screen(pixels []uint8, renderLisitiner chan int) {
 			os.Exit(0)
 		}
 		renderer.Present()
+
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
+			switch t := event.(type) {
 			case *sdl.QuitEvent:
 				return
+			case *sdl.KeyboardEvent:
+
+				switch t.Keysym.Sym {
+				case sdl.K_UP:
+					if t.State == sdl.PRESSED {
+						//fmt.Println("up pressed")
+						pad.Set(true, 4)
+					}
+					if t.State == sdl.RELEASED {
+						//fmt.Println("up released")
+						pad.Set(false, 4)
+					}
+				case sdl.K_DOWN:
+					if t.State == sdl.PRESSED {
+						//fmt.Println("down pressed")
+						pad.Set(true, 5)
+					}
+					if t.State == sdl.RELEASED {
+						//fmt.Println("down released")
+						pad.Set(false, 5)
+					}
+				case sdl.K_RIGHT:
+					if t.State == sdl.PRESSED {
+						//fmt.Println("down pressed")
+						pad.Set(true, 7)
+					}
+					if t.State == sdl.RELEASED {
+						//fmt.Println("down released")
+						pad.Set(false, 7)
+					}
+				case sdl.K_LEFT:
+					if t.State == sdl.PRESSED {
+						//fmt.Println("down pressed")
+						pad.Set(true, 6)
+					}
+					if t.State == sdl.RELEASED {
+						//fmt.Println("down released")
+						pad.Set(false, 6)
+					}
+				case sdl.K_a:
+					if t.State == sdl.PRESSED {
+						//fmt.Println("down pressed")
+						pad.Set(true, 0)
+					}
+					if t.State == sdl.RELEASED {
+						//fmt.Println("down released")
+						pad.Set(false, 0)
+					}
+				case sdl.K_b:
+					if t.State == sdl.PRESSED {
+						pad.Set(true, 1)
+					}
+					if t.State == sdl.RELEASED {
+						pad.Set(false, 1)
+					}
+				case sdl.K_RETURN:
+					if t.State == sdl.PRESSED {
+						pad.Set(true, 3)
+					}
+					if t.State == sdl.RELEASED {
+						pad.Set(false, 3)
+					}
+				case sdl.K_SPACE:
+					if t.State == sdl.PRESSED {
+						pad.Set(true, 2)
+					}
+					if t.State == sdl.RELEASED {
+						pad.Set(false, 2)
+					}
+				}
 
 			}
 
 		}
-
+		done <- 0
 	}
 
 }

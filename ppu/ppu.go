@@ -82,19 +82,23 @@ func (ppu *Ppu) ShowTiles() {
 
 	//each tile is an 8x8 box with each line repesenting 8 bits aka 1 byte hence 1 tile is 8bytes.Color
 	//info is tored in the next occuring 8 bytes for the earloer 8 bytes giving a total of 16 bytes
-	//if my hypothesis of 4kb pages is right we only have 2 pages for 8kb of data aka 512 tiles at at 128 bits (colorn included)
+	//if my hypothesis of 4kb pages is right we only have 2 pages for 8kb of data aka 512 tiles at at 128 bits (color included)
 	width := 0
 	height := 0
 	//SCREEN OFFSETS
-	bank := uint16(0)
+
 	for i := 0; i <= 0x3c0; i++ {
+		bank := ppu.ControlRegister.GetBackgroundTableAddress()
 		tileNum := uint16(ppu.Ram[i])
-		tile := ppu.ChrRom[((bank * 0x1000) + tileNum*16) : (bank*0x1000)+tileNum*16+16]
-		attributeIndex := (ppu.Ram[i+screenToAttribute(width, height)])
+
+		tile := ppu.ChrRom[((bank) + tileNum*16) : (bank)+tileNum*16+16]
+		attributeIndex := screenToAttribute(width, height)
 		colorIndex := ppu.Ram[0x3c0+uint16(attributeIndex)]
 		rowOrientation := ((colorIndex * 4) % 32) + 1
 		colOrientation := ((colorIndex * 4 * 4) / 32) + 1
+
 		color := uint8(0)
+
 		switch {
 		case width <= int(rowOrientation) && height <= int(colOrientation):
 			color = colorIndex & 0b00000011
@@ -107,6 +111,7 @@ func (ppu *Ppu) ShowTiles() {
 		default:
 			panic("error!")
 		}
+
 		color = 1 + (color * 4)
 		colors := []uint8{ppu.Palette[0], ppu.Palette[color], ppu.Palette[color+1], ppu.Palette[color+2]}
 		for y := 0; y < 8; y++ {
@@ -134,6 +139,66 @@ func (ppu *Ppu) ShowTiles() {
 		if width == 32 {
 			height++
 			width = 0
+		}
+
+	}
+	for i := 0; i < len(ppu.Oam); i = i + 4 {
+		yLoc := ppu.Oam[i]
+		tileNum := uint16(ppu.Oam[i+1])
+		bank := ppu.ControlRegister.GetSpriteTableAddress()
+		tile := ppu.ChrRom[((bank) + tileNum*16) : (bank)+tileNum*16+16]
+		xLoc := ppu.Oam[i+3]
+		attr := ppu.Oam[i+2]
+
+		verticalFlip := false
+		horizontalFlip := false
+
+		palleteNum := attr & 0b11
+
+		if attr>>7&0b1 != 0 {
+			verticalFlip = true
+		}
+		if attr>>6&0b01 != 0 {
+			horizontalFlip = true
+		}
+		color := 1 + (palleteNum * 4)
+		//17 to skip background colors?????? wrong
+		colors := []uint8{0, ppu.Palette[color], ppu.Palette[color+1], ppu.Palette[color+2]}
+
+		for y := 0; y < 8; y++ {
+			upper := tile[y]
+			lower := tile[y+8]
+			for x := 7; x >= 0; x-- {
+				col := upper&1<<1 | lower&1
+				upper = upper >> 1
+				lower = lower >> 1
+				screenRow := 0
+				screenCol := 0
+				switch {
+				case horizontalFlip && verticalFlip:
+					screenRow = 7 + int(xLoc) - x
+					screenCol = 7 - y + int(yLoc)
+				case !horizontalFlip && !verticalFlip:
+					screenRow = x + int(xLoc)
+					screenCol = y + int(yLoc)
+				case !horizontalFlip && verticalFlip:
+					screenRow = x + int(xLoc)
+					screenCol = 7 - y + int(yLoc)
+				case horizontalFlip && !verticalFlip:
+					screenRow = 7 + int(xLoc) - x
+					screenCol = y + int(yLoc)
+				default:
+					panic("impossible")
+				}
+				switch col {
+				case 1:
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[1]])
+				case 2:
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[2]])
+				case 3:
+					ppu.Frame.SetPixel(screenRow, screenCol, pallete[colors[3]])
+				}
+			}
 		}
 
 	}
@@ -201,10 +266,12 @@ func (ppu *Ppu) ReadDataOamRegister() uint8 {
 
 //sus
 func (ppu *Ppu) WriteOamDMA(data []uint8) {
+	//fmt.Println(data)
 	for i := 0; i < len(data); i++ {
-		ppu.Oam[i] = data[i]
-		i++
+		ppu.Oam[ppu.OamAddr] = data[i]
+		ppu.OamAddr.Increment()
 	}
+
 }
 
 type PPU_OAM_DATA uint8
@@ -317,8 +384,9 @@ func (ctrl *PPU_CONTROL) GetBaseNameTableAddress() uint16 {
 		return 0x2800
 	case a == 1 && b == 1:
 		return 0x2c00
+	default:
+		panic("error!")
 	}
-	return 0
 }
 func (ctrl *PPU_CONTROL) GetSpriteTableAddress() uint16 {
 	a := getBit(uint8(*ctrl), 3)
@@ -328,8 +396,10 @@ func (ctrl *PPU_CONTROL) GetSpriteTableAddress() uint16 {
 		return 0
 	case a == 1:
 		return 0x1000
+	default:
+		panic("impossible")
 	}
-	return 0
+
 }
 func (ctrl *PPU_CONTROL) GetBackgroundTableAddress() uint16 {
 	a := getBit(uint8(*ctrl), 4)
@@ -339,8 +409,10 @@ func (ctrl *PPU_CONTROL) GetBackgroundTableAddress() uint16 {
 		return 0
 	case a == 1:
 		return 0x1000
+	default:
+		panic("impossible")
 	}
-	return 0
+
 }
 func (ctrl *PPU_CONTROL) GetSpritesize() uint8 {
 	a := getBit(uint8(*ctrl), 5)
@@ -350,8 +422,10 @@ func (ctrl *PPU_CONTROL) GetSpritesize() uint8 {
 		return 8
 	case a == 1:
 		return 16
+	default:
+		panic("impossible")
 	}
-	return 0
+
 }
 
 func (ctrl *PPU_CONTROL) GetMasterSlave() uint8 {
@@ -442,7 +516,7 @@ func (ppu *Ppu) ReadData() uint8 {
 	addr := ppu.AddrRegister.Get()
 	switch addr {
 	case 0x3f10, 0x3f14, 0x3f18, 0x3f1c:
-		addr = addr - 10
+		addr = addr - 0x10
 	}
 	val := ppu.ControlRegister.ValueToIncrementBy()
 	ppu.AddrRegister.Increment(val)
@@ -450,6 +524,7 @@ func (ppu *Ppu) ReadData() uint8 {
 	switch {
 
 	case addr >= PALETTE_START && addr <= PALETTE_END:
+		//fmt.Println(ppu.Palette)
 		return ppu.Palette[(addr - PALETTE_START)]
 	case addr >= CHR_ROM_START && addr <= CHR_ROM_END:
 		result := ppu.buffer
@@ -467,7 +542,7 @@ func (ppu *Ppu) WriteData(data uint8) {
 	addr := ppu.AddrRegister.Get()
 	switch addr {
 	case 0x3f10, 0x3f14, 0x3f18, 0x3f1c:
-		addr = addr - 10
+		addr = addr - 0x10
 	}
 
 	switch {

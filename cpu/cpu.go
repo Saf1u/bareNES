@@ -44,6 +44,8 @@ const (
 	PPU_REGISTERS_END    uint16 = 0x3fff
 	PROG_ROM_START       uint16 = 0x8000
 	PROG_ROM_END         uint16 = 0xffff
+	CTRL_ONE                    = 0x4016
+	CTRL_TWO                    = 0x4017
 )
 
 const STACK_PAGE uint16 = 0x0100
@@ -57,13 +59,22 @@ type Cpu struct {
 	pc             uint16
 	statusRegister uint8
 	CpuBus         Bus
+	jumped         bool
 }
+type JoyPad struct {
+	buttons  uint8
+	strobe   bool
+	bitIndex uint8
+}
+
 type Bus struct {
 	cpuRam   [2048]uint8
 	rom      *rom.Rom
 	Ppu      *ppu.Ppu
 	cpuTicks int
 	Event    chan int
+	done     chan int
+	Pad      JoyPad
 }
 
 func (b *Bus) tick(amount int) {
@@ -72,11 +83,11 @@ func (b *Bus) tick(amount int) {
 	res := b.Ppu.Tick(3 * amount)
 
 	if res {
+
 		b.Ppu.ShowTiles()
-		select {
-		case b.Event <- 0:
-		default:
-		}
+
+		b.Event <- 0
+		<-b.done
 
 	}
 }
@@ -102,17 +113,54 @@ func (b *Bus) WriteSingleByte(addr uint16, data uint8) {
 		start := uint16(data) << 8
 		end := uint16(data)<<8 | 0x00FF
 		oamData := []uint8{}
-		for i := start; i < end; i++ {
+		for i := start; i <= end; i++ {
 			oamData = append(oamData, b.ReadSingleByte(i))
 		}
 		b.Ppu.WriteOamDMA(oamData)
 	case addr == PPU_CONTROL_REGISTER:
 		b.Ppu.WriteToCtrl(data)
+	case addr == CTRL_ONE:
+		b.Pad.write(data)
+	case addr == CTRL_TWO:
+		b.Pad.write(data)
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
 		b.WriteSingleByte(addr, data)
+
 	}
 
+}
+func (pad *JoyPad) write(data uint8) {
+	//tf?
+	if data&1 == 1 {
+
+		pad.strobe = true
+		pad.bitIndex = 0
+		return
+	}
+
+	pad.strobe = false
+
+}
+
+func (pad *JoyPad) read() uint8 {
+
+	if pad.bitIndex > 7 {
+		return 1
+	}
+	current := (pad.buttons >> (pad.bitIndex)) & uint8(0b1)
+	if !pad.strobe && pad.bitIndex <= 7 {
+		pad.bitIndex++
+	}
+	return current
+
+}
+func (pad *JoyPad) Set(val bool, pos int) {
+	if val {
+		pad.buttons = setBit(pad.buttons, pos)
+		return
+	}
+	pad.buttons = clearBit(pad.buttons, pos)
 }
 
 func (b *Bus) WriteDoubleByte(addr uint16, data uint16) {
@@ -137,6 +185,10 @@ func (b *Bus) ReadSingleByte(addr uint16) uint8 {
 		data = b.Ppu.ReadStatus()
 	case addr == PPU_OAM_DATA:
 		data = b.Ppu.ReadDataOamRegister()
+	case addr == CTRL_ONE:
+		data = b.Pad.read()
+	case addr == CTRL_TWO:
+		data = b.Pad.read()
 	case addr >= PPU_REGISTERS && addr <= PPU_REGISTERS_END:
 		addr = addr & 0b0010000000000111
 		b.ReadSingleByte(addr)
@@ -209,7 +261,7 @@ func (c *Cpu) addrMode(mode string) uint16 {
 	return dataLocation
 }
 
-func (c *Cpu) Init(rom *rom.Rom, event chan int) {
+func (c *Cpu) Init(rom *rom.Rom, event chan int, done chan int) {
 
 	c.CpuBus = Bus{}
 	c.CpuBus.cpuTicks = 0
@@ -217,6 +269,7 @@ func (c *Cpu) Init(rom *rom.Rom, event chan int) {
 	c.CpuBus.Ppu = ppu.NewPPU(rom.CharRom, rom.MirorType)
 	c.CpuBus.Ppu.PpuTicks = c.CpuBus.cpuTicks * 3
 	c.CpuBus.Event = event
+	c.CpuBus.done = done
 	c.xRegister = 0
 	c.aRegister = 0
 	c.yRegister = 0
@@ -840,6 +893,7 @@ func (c *Cpu) JMP(mode string) {
 func (c *Cpu) BMI(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 7) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -855,6 +909,7 @@ func (c *Cpu) BMI(tick int) {
 func (c *Cpu) BPL(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 7) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -869,10 +924,11 @@ func (c *Cpu) BPL(tick int) {
 }
 
 func (c *Cpu) BVS(tick int) {
+
 	toJump := c.addrMode(RELATIVE)
 
 	if hasBit(c.statusRegister, 6) {
-
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -891,6 +947,7 @@ func (c *Cpu) BVC(tick int) {
 	//location of perand to jump too in mem not acc value itself is loc
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 6) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + (toJump)
 
@@ -906,6 +963,7 @@ func (c *Cpu) BVC(tick int) {
 func (c *Cpu) BCC(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 0) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -923,6 +981,7 @@ func (c *Cpu) BEQ(tick int) {
 
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 1) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -938,6 +997,7 @@ func (c *Cpu) BEQ(tick int) {
 func (c *Cpu) BCS(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if hasBit(c.statusRegister, 0) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -953,6 +1013,7 @@ func (c *Cpu) BCS(tick int) {
 func (c *Cpu) BNE(tick int) {
 	toJump := c.addrMode(RELATIVE)
 	if !hasBit(c.statusRegister, 1) {
+		c.jumped = true
 		c.pc = c.pc + 2
 		c.pc = c.pc + uint16(toJump)
 
@@ -1053,12 +1114,14 @@ func (c *Cpu) RLA(mode string) {
 }
 
 func (c *Cpu) JSR() {
+	c.jumped = true
 	//we need to make sure we increment within the same cycle
 	addr := c.addrMode(ABSOLUTE)
 	c.PushDouble(c.pc + 2)
 	c.pc = addr
 }
 func (c *Cpu) RTS() {
+	c.jumped = true
 	val := c.PopDouble()
 	c.pc = val + 1
 
@@ -1090,6 +1153,7 @@ func (c *Cpu) ExecuteNMI() {
 	c.CpuBus.tick(2)
 }
 func (c *Cpu) RTI() {
+	c.jumped = true
 	c.statusRegister = c.Pop()
 	c.pc = c.PopDouble()
 	c.ClearBreak()
@@ -1167,15 +1231,17 @@ func (c *Cpu) Run() {
 		return
 	}
 	for {
+		c.jumped = false
 
 		if c.CpuBus.Ppu.PollNmi() {
 			c.CpuBus.Ppu.NmiOcurred = false
 			c.ExecuteNMI()
 		}
 
-		temp := c.pc
+		//temp := c.pc
 
 		location := c.CpuBus.ReadSingleByte(c.pc)
+		//fmt.Printf("%x %x %x %x\n", location, c.CpuBus.ReadDoubleByte(c.pc+1), c.pc, c.statusRegister)
 		mode := getAddrMode(location)
 		tick := c.TraceExecution(mode, fl)
 
@@ -1338,6 +1404,7 @@ func (c *Cpu) Run() {
 		case 0x2c:
 			c.BIT(mode)
 		case 0x4c, 0x6C:
+			c.jumped = true
 			c.JMP(mode)
 
 		case 0x2e:
@@ -1365,7 +1432,7 @@ func (c *Cpu) Run() {
 			c.CpuBus.tick(tick)
 		}
 
-		if c.pc == temp {
+		if !c.jumped {
 			val := getNumber(location)
 			if val == -1 {
 				break
