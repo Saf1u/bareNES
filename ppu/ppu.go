@@ -1,9 +1,9 @@
 package ppu
 
 import (
-	"emulator/common"
-	"emulator/render"
-	"emulator/utils"
+	"github.com/Saf1u/bareNES/common"
+	"github.com/Saf1u/bareNES/render"
+	"github.com/Saf1u/bareNES/utils"
 )
 
 const (

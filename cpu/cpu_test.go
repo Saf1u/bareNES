@@ -1,9 +1,9 @@
 package cpu
 
 import (
-	"emulator/utils"
 	"testing"
 
+	"github.com/Saf1u/bareNES/utils"
 	"github.com/stretchr/testify/assert"
 )
 

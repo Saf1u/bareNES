@@ -1,9 +1,9 @@
 package cpu
 
 import (
-	"emulator/ppu"
-	"emulator/rom"
-	"emulator/utils"
+	"github.com/Saf1u/bareNES/ppu"
+	"github.com/Saf1u/bareNES/rom"
+	"github.com/Saf1u/bareNES/utils"
 )
 
 const STACK uint8 = 0xfd

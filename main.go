@@ -1,12 +1,12 @@
 package main
 
 import (
-	"emulator/cpu"
-	"emulator/rom"
 	"fmt"
 	"log"
 	"os"
 
+	"github.com/Saf1u/bareNES/cpu"
+	"github.com/Saf1u/bareNES/rom"
 	"github.com/veandco/go-sdl2/sdl"
 )
 

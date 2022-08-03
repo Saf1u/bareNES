@@ -1,4 +1,4 @@
-module emulator
+module github.com/Saf1u/bareNES
 
 go 1.15
 

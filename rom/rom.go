@@ -1,9 +1,10 @@
 package rom
 
 import (
-	"emulator/common"
 	"errors"
 	"io/ioutil"
+
+	"github.com/Saf1u/bareNES/common"
 )
 
 var (
