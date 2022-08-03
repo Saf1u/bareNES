@@ -11,8 +11,8 @@ import (
 )
 
 func main() {
-
-	rom, err := rom.NewRom("roms/cyo.nes")
+	file := os.Args[1]
+	rom, err := rom.NewRom(file)
 
 	if err != nil {
 		fmt.Println(err)
