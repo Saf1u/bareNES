@@ -9,23 +9,24 @@ use brew to install go and sdl:
 brew install sdl2
 brew install go
 ```
+#### Option A:
 clone the repo and cd into directory and build:
 ```bash
 git clone https://github.com/Saf1u/bareNES
 cd bareNES
 go build .
 ```
-Only 2 roms are currently supported, nestest.rom (a compnent test for cpu) and cyo (a homebrew game more details below on it)
+Only 2 roms are currently supported, nestest.rom (a component test for cpu) and cyo (a homebrew game more details below on it)
 ```bash
 ./emulator roms/nestest.nes 
 ./emulator roms/cyo.nes 
 ```
-
-or simply download the 2 rom files in your the roms directory localy, ensure you installed sdl and go then run 
+#### Option B:
+Simply download the 2 rom files, ensure you have installed sdl and go, then run 
 ``` bash
 go get -u github.com/Saf1u/bareNES
 ```
-which will install the binary in your gopath ~/go/bin directory as BareNes you can then:
+which will install the binary in your gopath ~/go/bin directory as BareNes. You can then:
 ```bash
 bareNES [downloaded-rom-file]
 ```
@@ -49,7 +50,7 @@ button mappings
 | start| enter key     | 
 
 
-## Project description and lessons learnt 
+## Description
 A nintendo entertaiment system emulator written in go. The goal of this project was to gain an understanding of how old computer systems without operating systems and all the fancy things we have today worked to achieve their functionality. During the course of developing the emulator, I gained a better insight into the following technologies and mechanisms:
 
 1. CPU instruction interpretation and execution (Particularly 6502 assembly but the skills I learned here are transferable I believe)
@@ -67,7 +68,7 @@ Its amazing how much devs of the past were able to accomplish with such meager t
 The following are a list of resources that I found useful in implementing the emulator:
 1. [Middle Engine's 6502 blog](https://www.middle-engine.com/blog/posts/2020/06/23/programming-the-nes-the-6502-in-detail) I recommend using this to study the opcode behaviours, adressing modes etc to familiarize yourself with the cpu.
 2. [Masswerk 6502 instruction set](https://www.masswerk.at/6502/6502_instruction_set.html) may be a little intimidating if you are new to this stuff but it's an excellent resource that goes in depth on the opcodes and instruction behaviour in general.
-3. [Nes Dev wiki](https://www.nesdev.org/wiki/Nesdev_Wiki) an mazing resource that goes into detail about the system. Although extremely helpful, i found it a bit difficult siftting through hardware specifities and information that a game dev would need to know versus an emulator dev nevertheless,still a very crucial resource especially when it comes to undrstanding ppu (picture processing uinit) semantics.
+3. [Nes Dev wiki](https://www.nesdev.org/wiki/Nesdev_Wiki) an mazing resource that goes into detail about the system. Although extremely helpful, i found it a bit difficult siftting through hardware specifities and information that a game dev would need to know versus an emulator dev, nevertheless still a very crucial resource especially when it comes to understanding ppu (picture processing uinit) semantics.
 4. [Bugzmanov's Ebook on implementing a nes emulator in rust](https://bugzmanov.github.io/nes_ebook/chapter_1.html) Highly recommend this to supplement the sometimes cryptic info on nesdev. He has excellent explanantions of emulator behaviour plus code examples to clarify ambiguities.
 
 ## Current stage
