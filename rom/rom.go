@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	nesTags      = []uint8{0x4E, 0x45, 0x53, 0x1A}
+	nesTags      = [4]uint8{0x4E, 0x45, 0x53, 0x1A}
 	progRom uint = 16384
 	charRom uint = 8192
 )
@@ -52,12 +52,12 @@ func NewRom(file string) (*Rom, error) {
 	maxProg := uint(content[4]) * progRom
 
 	maxChar := uint(content[5]) * charRom
+
 	i := uint(16)
 	if (content[6])&0b100 == 0 {
 		i = uint(16 + 512)
 	}
 	i = uint(16)
-	//implement trainer check
 
 	for ; i < maxProg+16; i++ {
 
