@@ -21,6 +21,21 @@ Only 2 roms are currently supported, nestest.rom (a compnent test for cpu) and c
 ./emulator roms/cyo.nes 
 ```
 
+or simply download the 2 rom files in your the roms directory localy, ensure you installed sdl and go then run 
+``` bash
+go get -u github.com/Saf1u/bareNES
+```
+which will install the binary in your gopath ~/go/bin directory as BareNes you can then:
+```bash
+bareNES [downloaded-rom-file]
+```
+to run if you have your gopath in your system path variable or
+
+```bash
+~/go/bin/bareNES cyo.nes [downloaded-rom-file]
+```
+if your path is not in the env variable
+
 button mappings
 
 | conroller     | Keyboard      |    
