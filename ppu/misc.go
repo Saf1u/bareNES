@@ -2,7 +2,7 @@ package ppu
 
 func screenToAttribute(width int, height int) int {
 	//4x4 tiles of screen need to be chunked together
-	//we have 32 tiles in the wifth axis making it chunkable 8 times
+	//we have 32 tiles in the wifth axis making it chunkable 8 timess
 	height = (height / 4) * 8
 	return height + width/4
 }
