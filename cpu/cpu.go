@@ -272,6 +272,7 @@ func (c *Cpu) Init(rom *rom.Rom, event chan int, done chan int) {
 	c.statusRegister = 0x24
 	c.stackPtr = STACK
 	c.pc = c.CpuBus.ReadDoubleByte(0xfffc)
+	//load location
 }
 func (c *Cpu) SEC() {
 	c.statusRegister = (utils.SetBit(c.statusRegister, CARRY_FLAG))
@@ -284,7 +285,6 @@ func (c *Cpu) GetBit(pos int) uint8 {
 	return utils.GetBit(c.statusRegister, pos)
 }
 func (c *Cpu) SetZero() {
-
 	c.statusRegister = (utils.SetBit(c.statusRegister, ZERO_FLAG))
 }
 func (c *Cpu) ClearZero() {
@@ -526,24 +526,20 @@ func (c *Cpu) AND(mode string, hidden ...*uint8) {
 
 }
 
-func (c *Cpu) ORA(mode string, hidden ...*uint8) {
+func (c *Cpu) ORA(mode string) {
 	loc := c.addrMode(mode)
 
 	data := c.CpuBus.ReadSingleByte(loc)
-	if len(hidden) != 0 {
-		data = *(hidden[0])
-	}
+
 	c.aRegister = data | c.aRegister
 	c.alterZeroAndNeg(c.aRegister)
 
 }
 
-func (c *Cpu) EOR(mode string, hidden ...*uint8) {
+func (c *Cpu) EOR(mode string) {
 	loc := c.addrMode(mode)
 	data := c.CpuBus.ReadSingleByte(loc)
-	if len(hidden) != 0 {
-		data = *hidden[0]
-	}
+
 	c.aRegister = data ^ c.aRegister
 	c.alterZeroAndNeg(c.aRegister)
 
@@ -1230,11 +1226,11 @@ func (c *Cpu) Run() {
 			c.CpuBus.Ppu.NmiOcurred = false
 			c.ExecuteNMI()
 		}
-		location := c.CpuBus.ReadSingleByte(c.pc)
-		mode := getAddrMode(location)
+		opcode := c.CpuBus.ReadSingleByte(c.pc)
+		mode := getAddrMode(opcode)
 		tick := c.getTicks(mode)
 
-		switch location {
+		switch opcode {
 		case 0x00:
 			//c.BRK()
 			return
@@ -1415,14 +1411,14 @@ func (c *Cpu) Run() {
 			c.SHY(mode)
 
 		}
-		switch location {
+		switch opcode {
 		case 0x10, 0x30, 0x50, 0x70, 0x90, 0xb0, 0xd0, 0xf0:
 		default:
 			c.CpuBus.tick(tick)
 		}
 
 		if !c.jumped {
-			val := getNumber(location)
+			val := getNumber(opcode)
 			if val == -1 {
 				break
 			}
