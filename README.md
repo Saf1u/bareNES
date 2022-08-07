@@ -33,7 +33,7 @@ bareNES [downloaded-rom-file]
 to run if you have your gopath in your system path variable or
 
 ```bash
-~/go/bin/bareNES cyo.nes [downloaded-rom-file]
+~/go/bin/bareNES [downloaded-rom-file]
 ```
 if your path is not in the env variable
 
