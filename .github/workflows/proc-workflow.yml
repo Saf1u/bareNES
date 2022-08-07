@@ -8,5 +8,5 @@ jobs:
        - uses: actions/setup-go@v1
          with:
              go-version: '1.15'
-       - run: sudo apt-get install libsdl2-2.0
+       - run: apt install libsdl2{,-image,-mixer,-ttf,-gfx}-dev
        - run: go test ./...
