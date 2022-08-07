@@ -6,7 +6,7 @@ I havent tested on windows yet, but the following steps should be sufficent to r
 ### Depndencies
 use brew to install go and sdl:
 ```bash
-brew install sdl2
+brew install sdl2{,_image,_mixer,_ttf,_gfx} pkg-config
 brew install go
 ```
 #### Option A:
@@ -18,8 +18,8 @@ go build .
 ```
 Only 2 roms are currently supported, nestest.rom (a component test for cpu) and cyo (a homebrew game more details below on it)
 ```bash
-./emulator roms/nestest.nes 
-./emulator roms/cyo.nes 
+./bareNES roms/nestest.nes 
+./bareNES roms/cyo.nes 
 ```
 #### Option B:
 Simply download the 2 rom files, ensure you have installed sdl and go, then run 
