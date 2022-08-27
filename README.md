@@ -24,7 +24,7 @@ Only 2 roms are currently supported, nestest.rom (a component test for cpu) and 
 #### Option B:
 Simply download the 2 rom files, ensure you have installed sdl and go, then run 
 ``` bash
-go get -u github.com/Saf1u/bareNES
+go get github.com/Saf1u/bareNES@latest
 ```
 which will install the binary in your gopath ~/go/bin directory as BareNes. You can then:
 ```bash
